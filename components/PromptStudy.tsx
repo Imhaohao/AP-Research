@@ -1,6 +1,14 @@
 'use client'
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+
+function formatOpenAiHelperError(message: string): string {
+  const m = (message || '').trim();
+  if (/quota|billing|insufficient_quota|payment method/i.test(m)) {
+    return `${m} — Fix billing or add credits: https://platform.openai.com/account/billing`;
+  }
+  return m;
+}
 
 /**
  * A simple TypeScript React component that guides a student through a
@@ -9,7 +17,7 @@ import React, { useState } from "react";
  * assigned to either a control or treatment group, complete a pre‑survey,
  * watch a mini‑module (prompt engineering vs digital literacy), write a
  * short explanation on an unfamiliar topic using AI if they choose, and
- * complete a post‑survey. All data is kept client‑side in this demo.
+ * complete a post‑survey. Results are sent to Supabase when the participant reaches the thank‑you screen.
  */
 export default function PromptStudy() {
   type Group = "control" | "treatment";
@@ -69,6 +77,129 @@ export default function PromptStudy() {
   // Lottery state
   const [lotteryOptIn, setLotteryOptIn] = useState(false);
   const [participantNumber, setParticipantNumber] = useState('');
+
+  /** Stable id for upserts so lottery updates merge into the same row */
+  const [clientSubmissionId] = useState(() =>
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `study-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  );
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveMessage, setSaveMessage] = useState('');
+  
+  // ChatGPT (OpenAI API) writing assistant on the task step
+  const [openAiApiKey, setOpenAiApiKey] = useState('');
+  const [openAiMessages, setOpenAiMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+  const [openAiInput, setOpenAiInput] = useState('');
+  const [openAiLoading, setOpenAiLoading] = useState(false);
+  const [openAiError, setOpenAiError] = useState('');
+
+  const [sessionStartedAt] = useState(() => new Date().toISOString());
+  const chatTurnIndexRef = useRef(0);
+
+  /** Optional: opens school Gemini in a new tab only (no iframe) */
+  const schoolGeminiUrl = (process.env.NEXT_PUBLIC_SCHOOL_GEMINI_URL ?? '').trim();
+  /** If true, hide built-in OpenAI chat (e.g. school uses only their own Gemini link) */
+  const schoolGeminiOnly =
+    process.env.NEXT_PUBLIC_GEMINI_SCHOOL_ONLY === 'true' ||
+    process.env.NEXT_PUBLIC_GEMINI_SCHOOL_ONLY === '1';
+
+  const buildSessionProfile = useCallback((): Record<string, unknown> => {
+    return {
+      client_submission_id: clientSubmissionId,
+      study_group: group,
+      session_started_at: sessionStartedAt,
+      profile_captured_at: new Date().toISOString(),
+      stage,
+      task_topic: taskData.topic,
+      consent_given: consent,
+      school_gemini_link_configured: Boolean(schoolGeminiUrl),
+      school_gemini_only_mode: schoolGeminiOnly,
+      browser:
+        typeof navigator !== 'undefined'
+          ? {
+              language: navigator.language,
+              userAgent: navigator.userAgent,
+              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            }
+          : null,
+    };
+  }, [
+    clientSubmissionId,
+    group,
+    sessionStartedAt,
+    stage,
+    taskData.topic,
+    consent,
+    schoolGeminiUrl,
+    schoolGeminiOnly,
+  ]);
+
+  const flushSubmission = useCallback(async () => {
+    setSaveStatus('saving');
+    setSaveMessage('');
+    const data: Record<string, unknown> = {
+      consent,
+      pre_responses: preResponses,
+      post_responses: postResponses,
+      task_data: taskData,
+      practice_prompt: practicePrompt,
+      practice_tries: practiceTries,
+      show_practice_panel: showPractice,
+      lottery_opt_in: lotteryOptIn,
+      participant_number: participantNumber.trim() || null,
+      open_ai_messages: openAiMessages,
+      session_profile: buildSessionProfile(),
+      meta: {
+        school_gemini_link_configured: Boolean(schoolGeminiUrl),
+        school_gemini_only_mode: schoolGeminiOnly,
+      },
+    };
+    try {
+      const res = await fetch('/api/study/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_submission_id: clientSubmissionId,
+          study_group: group,
+          data,
+        }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        throw new Error(json.error || `Save failed (${res.status})`);
+      }
+      setSaveStatus('saved');
+      setSaveMessage('Responses saved for the research team.');
+    } catch (e) {
+      setSaveStatus('error');
+      setSaveMessage(e instanceof Error ? e.message : 'Could not save.');
+    }
+  }, [
+    clientSubmissionId,
+    group,
+    consent,
+    preResponses,
+    postResponses,
+    taskData,
+    practicePrompt,
+    practiceTries,
+    showPractice,
+    lotteryOptIn,
+    participantNumber,
+    openAiMessages,
+    schoolGeminiUrl,
+    schoolGeminiOnly,
+    buildSessionProfile,
+  ]);
+
+  useEffect(() => {
+    if (stage !== 'complete') return;
+    const t = window.setTimeout(() => {
+      void flushSubmission();
+    }, 300);
+    return () => clearTimeout(t);
+  }, [stage, flushSubmission]);
 
   // Get current step index for progress bar
   const stages: Stage[] = ["consent", "preSurvey", "module", "task", "postSurvey", "complete"];
@@ -148,14 +279,15 @@ export default function PromptStudy() {
     );
   }
 
-  function renderLikert(value: number, onChange: (v: number) => void) {
+  function renderLikert(value: number, onChange: (v: number) => void, name: string) {
     return (
       <div className="likert-scale">
         {[1, 2, 3, 4, 5].map((val) => (
           <div key={val} className="likert-option">
-            <label htmlFor={`likert-${val}`}>
+            <label htmlFor={`${name}-${val}`}>
               <input
-                id={`likert-${val}`}
+                id={`${name}-${val}`}
+                name={name}
                 type="radio"
                 value={val}
                 checked={value === val}
@@ -183,35 +315,35 @@ export default function PromptStudy() {
           <div className="form-group">
             <label>
               <strong>I understand how to write clear and specific prompts for AI tools.</strong>
-              {renderLikert(preResponses.q1, (v) => setPreResponses({ ...preResponses, q1: v }))}
+              {renderLikert(preResponses.q1, (v) => setPreResponses({ ...preResponses, q1: v }), "pre-q1")}
             </label>
           </div>
 
           <div className="form-group">
             <label>
               <strong>When I use AI, I usually ask for final answers instead of explanations.</strong>
-              {renderLikert(preResponses.q2, (v) => setPreResponses({ ...preResponses, q2: v }))}
+              {renderLikert(preResponses.q2, (v) => setPreResponses({ ...preResponses, q2: v }), "pre-q2")}
             </label>
           </div>
 
           <div className="form-group">
             <label>
               <strong>I use AI to help me think through problems step‑by‑step.</strong>
-              {renderLikert(preResponses.q3, (v) => setPreResponses({ ...preResponses, q3: v }))}
+              {renderLikert(preResponses.q3, (v) => setPreResponses({ ...preResponses, q3: v }), "pre-q3")}
             </label>
           </div>
 
           <div className="form-group">
             <label>
               <strong>I know how to tell if AI responses are accurate or biased.</strong>
-              {renderLikert(preResponses.q4, (v) => setPreResponses({ ...preResponses, q4: v }))}
+              {renderLikert(preResponses.q4, (v) => setPreResponses({ ...preResponses, q4: v }), "pre-q4")}
             </label>
           </div>
 
           <div className="form-group">
             <label>
               <strong>I think AI can help me learn more effectively if used responsibly.</strong>
-              {renderLikert(preResponses.q5, (v) => setPreResponses({ ...preResponses, q5: v }))}
+              {renderLikert(preResponses.q5, (v) => setPreResponses({ ...preResponses, q5: v }), "pre-q5")}
             </label>
           </div>
 
@@ -486,6 +618,90 @@ export default function PromptStudy() {
     );
   }
 
+  async function handleOpenAiMessage() {
+    if (!openAiInput.trim()) {
+      return;
+    }
+
+    const userMessage = openAiInput.trim();
+    setOpenAiInput('');
+    setOpenAiLoading(true);
+    setOpenAiError('');
+
+    const newMessages = [...openAiMessages, { role: 'user' as const, content: userMessage }];
+    setOpenAiMessages(newMessages);
+
+    try {
+      const systemPrompt = `You are a helpful writing assistant helping a student write a 200-250 word explanation for a 9th-grade student about: "${taskData.topic}".
+
+Your role is to:
+- Help them brainstorm ideas and structure their explanation
+- Provide guidance on clarity and age-appropriateness
+- Suggest ways to explain complex concepts simply
+- Encourage critical thinking and learning
+
+Do NOT write the explanation for them. Instead, guide them with questions, suggestions, and feedback.`;
+
+      const transcript = newMessages
+        .map((m) => `${m.role === 'user' ? 'Student' : 'Assistant'}: ${m.content}`)
+        .join('\n\n');
+      const fullPrompt = `${systemPrompt}\n\nConversation:\n${transcript}`;
+
+      const response = await fetch('/api/llm/openai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: fullPrompt,
+          apiKey: openAiApiKey.trim() || undefined,
+        }),
+      });
+
+      const data = (await response.json()) as {
+        response?: string;
+        model?: string;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(
+          formatOpenAiHelperError(String(data.error || 'Failed to get response from ChatGPT'))
+        );
+      }
+
+      const assistantText = data.response ?? '';
+      setOpenAiMessages([...newMessages, { role: 'assistant' as const, content: assistantText }]);
+
+      chatTurnIndexRef.current += 1;
+      void fetch('/api/study/log-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_submission_id: clientSubmissionId,
+          study_group: group,
+          turn_index: chatTurnIndexRef.current,
+          session_profile: buildSessionProfile(),
+          user_message: userMessage,
+          full_prompt: fullPrompt,
+          assistant_response: assistantText,
+          model: data.model ?? null,
+        }),
+      }).catch(() => {});
+
+      if (!taskData.usedAi) {
+        setTaskData({ ...taskData, usedAi: true });
+      }
+    } catch (error) {
+      setOpenAiError(
+        formatOpenAiHelperError(
+          error instanceof Error ? error.message : 'An error occurred'
+        )
+      );
+      setOpenAiMessages(openAiMessages);
+    } finally {
+      setOpenAiLoading(false);
+    }
+  }
+
   function renderTask() {
     return (
       <div className="lms-container">
@@ -493,6 +709,198 @@ export default function PromptStudy() {
         <div className="lms-card">
           <h2>Writing Task</h2>
           <p>Select a topic below and write a 200–250 word explanation for a 9th‑grade student. You may use AI, but you must disclose how you used it.</p>
+
+          {schoolGeminiUrl ? (
+            <div
+              style={{
+                marginTop: '1.5rem',
+                marginBottom: '1.5rem',
+                padding: '1.25rem',
+                background: '#f0f7ff',
+                borderRadius: '8px',
+                border: '2px solid #1a5490',
+              }}
+            >
+              <h3 style={{ margin: '0 0 0.5rem', color: '#1a5490', fontSize: '1.05rem' }}>School Gemini (optional)</h3>
+              <p style={{ margin: '0 0 0.75rem', fontSize: '0.9rem', color: '#333' }}>
+                If your class uses Google&apos;s Gemini in the browser, open it in a new tab with your school account.
+              </p>
+              <a
+                href={schoolGeminiUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-block',
+                  padding: '0.5rem 1rem',
+                  background: '#1a5490',
+                  color: '#fff',
+                  borderRadius: '6px',
+                  textDecoration: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
+                }}
+              >
+                Open school Gemini in a new tab
+              </a>
+            </div>
+          ) : null}
+
+          {schoolGeminiOnly && !schoolGeminiUrl ? (
+            <div
+              role="alert"
+              style={{
+                marginTop: '1rem',
+                padding: '1rem',
+                background: '#fff3cd',
+                border: '1px solid #ffc107',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+                fontSize: '0.9rem',
+              }}
+            >
+              <strong>School Gemini URL not configured.</strong> Ask your teacher to set{' '}
+              <code>NEXT_PUBLIC_SCHOOL_GEMINI_URL</code> in the app environment, or set{' '}
+              <code>NEXT_PUBLIC_GEMINI_SCHOOL_ONLY=false</code> to use the built-in ChatGPT assistant instead.
+            </div>
+          ) : null}
+
+          {!schoolGeminiOnly && (
+            <div
+              style={{
+                marginTop: '1.5rem',
+                marginBottom: '1.5rem',
+                padding: '1.5rem',
+                background: '#f6faf8',
+                borderRadius: '8px',
+                border: '2px solid #10a37f',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
+                <span style={{ fontSize: '1.5rem', marginRight: '0.5rem' }}>🤖</span>
+                <h3 style={{ margin: 0, color: '#0d8f6e' }}>ChatGPT writing assistant</h3>
+              </div>
+              <p style={{ marginBottom: '1rem', fontSize: '0.95rem' }}>
+                Ask for brainstorming, structure, and feedback. The model is instructed not to write your explanation for you — only to
+                guide you. Think critically about any suggestions.
+              </p>
+
+              <div className="form-group" style={{ background: '#ffffff', borderLeftColor: '#10a37f', marginBottom: '1rem' }}>
+                <label>
+                  <strong>OpenAI API key (optional):</strong>
+                  <input
+                    type="password"
+                    value={openAiApiKey}
+                    onChange={(e) => setOpenAiApiKey(e.target.value)}
+                    placeholder="sk-... — leave blank if the server has OPENAI_API_KEY set"
+                    style={{ marginTop: '0.5rem' }}
+                  />
+                  <small style={{ display: 'block', marginTop: '0.25rem', color: '#666', fontSize: '0.875rem' }}>
+                    Used only in this browser session unless your teacher configured a server key.
+                  </small>
+                </label>
+              </div>
+
+              <div
+                style={{
+                  background: '#ffffff',
+                  borderRadius: '6px',
+                  border: '1px solid #e0e0e0',
+                  maxHeight: '400px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                <div
+                  style={{
+                    padding: '1rem',
+                    borderBottom: '1px solid #e0e0e0',
+                    maxHeight: '300px',
+                    overflowY: 'auto',
+                    flex: 1,
+                  }}
+                >
+                  {openAiMessages.length === 0 ? (
+                    <p style={{ color: '#666', fontStyle: 'italic', textAlign: 'center', margin: '2rem 0' }}>
+                      Start a conversation. Your topic is used in the instructions sent with each message.
+                    </p>
+                  ) : (
+                    openAiMessages.map((msg, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          marginBottom: '1rem',
+                          padding: '0.75rem',
+                          background: msg.role === 'user' ? '#e8f7f2' : '#f5f5f5',
+                          borderRadius: '6px',
+                          borderLeft: `3px solid ${msg.role === 'user' ? '#10a37f' : '#666'}`,
+                        }}
+                      >
+                        <strong style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem', color: '#666' }}>
+                          {msg.role === 'user' ? 'You' : 'ChatGPT'}
+                        </strong>
+                        <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{msg.content}</div>
+                      </div>
+                    ))
+                  )}
+                  {openAiLoading && (
+                    <div style={{ padding: '0.75rem', color: '#666', fontStyle: 'italic' }}>ChatGPT is thinking...</div>
+                  )}
+                </div>
+
+                {openAiError && (
+                  <div
+                    style={{
+                      padding: '0.75rem',
+                      background: '#ffebee',
+                      color: '#c62828',
+                      borderTop: '1px solid #e0e0e0',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    Error: {openAiError}
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    padding: '0.75rem',
+                    borderTop: '1px solid #e0e0e0',
+                    display: 'flex',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <textarea
+                    value={openAiInput}
+                    onChange={(e) => setOpenAiInput(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleOpenAiMessage();
+                      }
+                    }}
+                    placeholder="Ask for help with your explanation..."
+                    rows={2}
+                    style={{
+                      flex: 1,
+                      padding: '0.5rem',
+                      border: '1px solid #e0e0e0',
+                      borderRadius: '4px',
+                      resize: 'none',
+                      fontFamily: 'inherit',
+                    }}
+                    disabled={openAiLoading}
+                  />
+                  <button
+                    onClick={handleOpenAiMessage}
+                    disabled={openAiLoading || !openAiInput.trim()}
+                    style={{ padding: '0.5rem 1rem', whiteSpace: 'nowrap' }}
+                  >
+                    {openAiLoading ? 'Sending...' : 'Send'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="form-group">
             <label>
@@ -601,35 +1009,35 @@ export default function PromptStudy() {
           <div className="form-group">
             <label>
               <strong>I feel more confident writing effective AI prompts.</strong>
-              {renderLikert(postResponses.q1, (v) => setPostResponses({ ...postResponses, q1: v }))}
+              {renderLikert(postResponses.q1, (v) => setPostResponses({ ...postResponses, q1: v }), "post-q1")}
             </label>
           </div>
 
           <div className="form-group">
             <label>
               <strong>I now ask AI for explanations or reasoning rather than just answers.</strong>
-              {renderLikert(postResponses.q2, (v) => setPostResponses({ ...postResponses, q2: v }))}
+              {renderLikert(postResponses.q2, (v) => setPostResponses({ ...postResponses, q2: v }), "post-q2")}
             </label>
           </div>
 
           <div className="form-group">
             <label>
               <strong>The activity helped me understand how to learn with AI more effectively.</strong>
-              {renderLikert(postResponses.q3, (v) => setPostResponses({ ...postResponses, q3: v }))}
+              {renderLikert(postResponses.q3, (v) => setPostResponses({ ...postResponses, q3: v }), "post-q3")}
             </label>
           </div>
 
           <div className="form-group">
             <label>
               <strong>I now think more critically about AI responses.</strong>
-              {renderLikert(postResponses.q4, (v) => setPostResponses({ ...postResponses, q4: v }))}
+              {renderLikert(postResponses.q4, (v) => setPostResponses({ ...postResponses, q4: v }), "post-q4")}
             </label>
           </div>
 
           <div className="form-group">
             <label>
               <strong>I understand how to use AI ethically for schoolwork.</strong>
-              {renderLikert(postResponses.q5, (v) => setPostResponses({ ...postResponses, q5: v }))}
+              {renderLikert(postResponses.q5, (v) => setPostResponses({ ...postResponses, q5: v }), "post-q5")}
             </label>
           </div>
 
@@ -681,6 +1089,31 @@ export default function PromptStudy() {
         <div className="lms-card">
           <h2 style={{ color: '#27ae60', marginBottom: '1rem' }}>✓ Thank You!</h2>
           <p>Your responses have been recorded anonymously.</p>
+
+          <div
+            style={{
+              marginTop: '1rem',
+              padding: '0.75rem 1rem',
+              borderRadius: '8px',
+              fontSize: '0.9rem',
+              background:
+                saveStatus === 'error' ? '#ffebee' : saveStatus === 'saved' ? '#e8f5e9' : '#f5f5f5',
+              color: saveStatus === 'error' ? '#c62828' : '#333',
+              border: `1px solid ${saveStatus === 'error' ? '#ef9a9a' : saveStatus === 'saved' ? '#a5d6a7' : '#e0e0e0'}`,
+            }}
+          >
+            {saveStatus === 'saving' && <span>Saving responses…</span>}
+            {saveStatus === 'saved' && <span>{saveMessage}</span>}
+            {saveStatus === 'error' && (
+              <span>
+                {saveMessage}{' '}
+                <button type="button" onClick={() => void flushSubmission()} style={{ marginLeft: '0.5rem' }}>
+                  Retry
+                </button>
+              </span>
+            )}
+            {saveStatus === 'idle' && <span>Preparing save…</span>}
+          </div>
           
           <div style={{ marginTop: '2rem', padding: '1.5rem', background: '#fff9e6', borderRadius: '8px', border: '2px solid #ffc107' }}>
             <h3 style={{ color: '#f57c00', marginTop: 0, marginBottom: '1rem' }}>🎉 Optional: Enter our GPT-5 Lottery</h3>

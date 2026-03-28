@@ -11,6 +11,16 @@ A Next.js application for a quasi-experimental prompt engineering study. This we
 - Post-survey with reflection questions
 - Client-side data storage (for demo purposes)
 
+## Writing task: ChatGPT (OpenAI API)
+
+The built-in assistant calls **`/api/llm/openai`** with a fixed “writing coach” prompt (it should not draft the full explanation for students). Configure the server with **`OPENAI_API_KEY`** in `.env.local`, or students can paste a key in the task UI for that session only.
+
+## Optional: school Gemini link
+
+If students also use **Gemini in the browser** with a school account, set **`NEXT_PUBLIC_SCHOOL_GEMINI_URL`** to that page. The study UI shows a **Open in new tab** link only (no iframe).
+
+- **`NEXT_PUBLIC_GEMINI_SCHOOL_ONLY=true`** — hide the built-in ChatGPT API chat; only the optional school Gemini link appears (if the URL is set).
+
 ## Getting Started
 
 ### Prerequisites

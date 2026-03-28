@@ -13,7 +13,7 @@ import React, { useState } from "react";
  */
 export default function PromptStudy() {
   type Group = "control" | "treatment";
-  type Stage = "consent" | "preSurvey" | "module" | "task" | "postSurvey" | "complete";
+  type Stage = "consent" | "preSurvey" | "module" | "promptPractice" | "task" | "postSurvey" | "complete";
 
   // Randomly assign on first render
   const [group] = useState<Group>(() => {
@@ -56,6 +56,18 @@ export default function PromptStudy() {
     cited: false,
   });
   const [consent, setConsent] = useState(false);
+  const [userPrompt, setUserPrompt] = useState("");
+  const [llmResponses, setLlmResponses] = useState<{
+    openai?: { response: string; error?: string };
+    anthropic?: { response: string; error?: string };
+    google?: { response: string; error?: string };
+  }>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [apiTokens, setApiTokens] = useState({
+    openai: "",
+    anthropic: "",
+    google: "",
+  });
 
   function renderConsent() {
     return (
@@ -88,16 +100,26 @@ export default function PromptStudy() {
     );
   }
 
-  function renderLikert(value: number, onChange: (v: number) => void) {
+  function renderLikert(value: number, onChange: (v: number) => void, name: string) {
     return (
       <span>
         {[1, 2, 3, 4, 5].map((val) => (
-          <label key={val} style={{ marginRight: 8 }}>
+          <label 
+            key={`${name}-${val}`} 
+            htmlFor={`${name}-${val}`}
+            style={{ marginRight: 8, cursor: "pointer" }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <input
               type="radio"
+              id={`${name}-${val}`}
+              name={name}
               value={val}
               checked={value === val}
-              onChange={() => onChange(val)}
+              onChange={(e) => {
+                e.stopPropagation();
+                onChange(val);
+              }}
             />
             &nbsp;{val}
           </label>
@@ -111,40 +133,45 @@ export default function PromptStudy() {
       <div style={{ maxWidth: 800, margin: "0 auto" }}>
         <h2>Pre‑Survey</h2>
         <p>Please rate your agreement with each statement (1=Strongly Disagree, 5=Strongly Agree).</p>
+        <div style={{ marginBottom: 20 }}>
         <div>
-          <label>
             <strong>1. I understand how to write clear and specific prompts for AI tools.</strong>
-            <br />
-            {renderLikert(preResponses.q1, (v) => setPreResponses({ ...preResponses, q1: v }))}
-          </label>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            {renderLikert(preResponses.q1, (v) => setPreResponses((prev) => ({ ...prev, q1: v })), "pre-q1")}
+          </div>
         </div>
+        <div style={{ marginBottom: 20 }}>
         <div>
-          <label>
             <strong>2. When I use AI, I usually ask for final answers instead of explanations.</strong>
-            <br />
-            {renderLikert(preResponses.q2, (v) => setPreResponses({ ...preResponses, q2: v }))}
-          </label>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            {renderLikert(preResponses.q2, (v) => setPreResponses((prev) => ({ ...prev, q2: v })), "pre-q2")}
+          </div>
         </div>
+        <div style={{ marginBottom: 20 }}>
         <div>
-          <label>
             <strong>3. I use AI to help me think through problems step‑by‑step.</strong>
-            <br />
-            {renderLikert(preResponses.q3, (v) => setPreResponses({ ...preResponses, q3: v }))}
-          </label>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            {renderLikert(preResponses.q3, (v) => setPreResponses((prev) => ({ ...prev, q3: v })), "pre-q3")}
+          </div>
         </div>
+        <div style={{ marginBottom: 20 }}>
         <div>
-          <label>
             <strong>4. I know how to tell if AI responses are accurate or biased.</strong>
-            <br />
-            {renderLikert(preResponses.q4, (v) => setPreResponses({ ...preResponses, q4: v }))}
-          </label>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            {renderLikert(preResponses.q4, (v) => setPreResponses((prev) => ({ ...prev, q4: v })), "pre-q4")}
+          </div>
         </div>
+        <div style={{ marginBottom: 20 }}>
         <div>
-          <label>
             <strong>5. I think AI can help me learn more effectively if used responsibly.</strong>
-            <br />
-            {renderLikert(preResponses.q5, (v) => setPreResponses({ ...preResponses, q5: v }))}
-          </label>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            {renderLikert(preResponses.q5, (v) => setPreResponses((prev) => ({ ...prev, q5: v })), "pre-q5")}
+          </div>
         </div>
         <div style={{ marginTop: 16 }}>
           <label>
@@ -201,25 +228,59 @@ export default function PromptStudy() {
             <p>
               This brief lesson introduces prompt engineering: the process of
               framing clear and structured requests to AI so that you get more
-              useful answers.
+              useful answers. We'll explore four key prompting techniques.
+            </p>
+            
+            <h3 style={{ marginTop: 24 }}>1. Role-Context-Task Prompting</h3>
+            <p>
+              Structure your prompts with three key elements:
             </p>
             <ul>
-              <li>
-                <strong>Be specific</strong>: Tell the AI exactly what you want to
-                know.
-              </li>
-              <li>
-                <strong>Add context</strong>: Explain who you are or who the
-                response is for.
-              </li>
-              <li>
-                <strong>Ask for reasoning</strong>: Request step‑by‑step
-                explanations or analogies.
-              </li>
+              <li><strong>Role</strong>: Define who the AI should act as (e.g., "You are a high school science teacher")</li>
+              <li><strong>Context</strong>: Provide background information (e.g., "Your student is in 9th grade and learning about photosynthesis")</li>
+              <li><strong>Task</strong>: Clearly state what you want (e.g., "Explain photosynthesis in simple terms with one real-world example")</li>
             </ul>
+            <p style={{ fontStyle: "italic", marginTop: 8 }}>
+              Example: "You are a high school science teacher. Your student is in 9th grade and learning about photosynthesis. Explain photosynthesis in simple terms with one real-world example."
+            </p>
+
+            <h3 style={{ marginTop: 24 }}>2. Chain of Thought Prompting</h3>
             <p>
-              Take a moment to think about how you might prompt an AI to teach
-              you a math concept step‑by‑step.
+              Ask the AI to show its reasoning process step-by-step:
+            </p>
+            <ul>
+              <li>Request intermediate steps or "thinking out loud"</li>
+              <li>Use phrases like "think step by step" or "show your reasoning"</li>
+              <li>This helps you understand how the AI arrived at its answer</li>
+            </ul>
+            <p style={{ fontStyle: "italic", marginTop: 8 }}>
+              Example: "Solve this math problem: If 3 apples cost $6, how much do 5 apples cost? Show your reasoning step by step."
+            </p>
+
+            <h3 style={{ marginTop: 24 }}>3. Zero-Shot Prompting</h3>
+            <p>
+              Give the AI a task without providing examples:
+            </p>
+            <ul>
+              <li>Directly state what you want without showing examples</li>
+              <li>Works best for straightforward tasks</li>
+              <li>Most common type of prompting</li>
+            </ul>
+            <p style={{ fontStyle: "italic", marginTop: 8 }}>
+              Example: "Write a haiku about spring." (No example provided)
+            </p>
+
+            <h3 style={{ marginTop: 24 }}>4. One-Shot Prompting</h3>
+            <p>
+              Provide one example before asking the AI to do the task:
+            </p>
+            <ul>
+              <li>Show the AI one example of what you want</li>
+              <li>Then ask it to create something similar</li>
+              <li>Helps the AI understand the format or style you prefer</li>
+            </ul>
+            <p style={{ fontStyle: "italic", marginTop: 8 }}>
+              Example: "Translate to Spanish: 'Hello' → 'Hola'. Now translate: 'Good morning'"
             </p>
           </>
         ) : (
@@ -245,14 +306,230 @@ export default function PromptStudy() {
           </>
         )}
         {group === "treatment" ? (
-          <button onClick={() => setStage("task")} style={{ marginTop: 24 }}>
-            Start Writing Task
+          <button onClick={() => setStage("promptPractice")} style={{ marginTop: 24 }}>
+            Try Prompt Practice
           </button>
         ) : (
           <button onClick={() => setStage("task")} style={{ marginTop: 24 }}>
             Start Writing Task
           </button>
         )}
+      </div>
+    );
+  }
+
+  async function handlePromptSubmit() {
+    if (!userPrompt.trim()) {
+      alert("Please enter a prompt");
+      return;
+    }
+
+    setIsLoading(true);
+    setLlmResponses({});
+
+    try {
+      // Call all three LLMs in parallel
+      const [openaiResponse, anthropicResponse, googleResponse] = await Promise.allSettled([
+        fetch("/api/llm/openai", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: userPrompt, apiKey: apiTokens.openai }),
+        }),
+        fetch("/api/llm/anthropic", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: userPrompt, apiKey: apiTokens.anthropic }),
+        }),
+        fetch("/api/llm/google", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: userPrompt, apiKey: apiTokens.google }),
+        }),
+      ]);
+
+      const responses: typeof llmResponses = {};
+
+      // Process OpenAI response
+      if (openaiResponse.status === "fulfilled") {
+        const data = await openaiResponse.value.json();
+        if (openaiResponse.value.ok) {
+          responses.openai = { response: data.response };
+        } else {
+          responses.openai = { response: "", error: data.error || "OpenAI API error" };
+        }
+      } else {
+        responses.openai = { response: "", error: openaiResponse.reason?.message || "Failed to call OpenAI" };
+      }
+
+      // Process Anthropic response
+      if (anthropicResponse.status === "fulfilled") {
+        const data = await anthropicResponse.value.json();
+        if (anthropicResponse.value.ok) {
+          responses.anthropic = { response: data.response };
+        } else {
+          responses.anthropic = { response: "", error: data.error || "Anthropic API error" };
+        }
+      } else {
+        responses.anthropic = { response: "", error: anthropicResponse.reason?.message || "Failed to call Anthropic" };
+      }
+
+      // Process Google response
+      if (googleResponse.status === "fulfilled") {
+        const data = await googleResponse.value.json();
+        if (googleResponse.value.ok) {
+          responses.google = { response: data.response };
+        } else {
+          responses.google = { response: "", error: data.error || "Google API error" };
+        }
+      } else {
+        responses.google = { response: "", error: googleResponse.reason?.message || "Failed to call Google" };
+      }
+
+      setLlmResponses(responses);
+    } catch (error) {
+      console.error("Error calling LLMs:", error);
+      alert("An error occurred while calling the LLMs. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  function renderPromptPractice() {
+    return (
+      <div style={{ maxWidth: 1000, margin: "0 auto" }}>
+        <h2>Prompt Practice</h2>
+        <p>
+          Try out the prompting techniques you just learned! Enter a prompt below and see how three different AI models respond.
+          This will help you compare different AI responses and refine your prompting skills.
+        </p>
+
+        <div style={{ marginTop: 24, padding: 16, backgroundColor: "#f5f5f5", borderRadius: 8 }}>
+          <h3>API Configuration</h3>
+          <p style={{ fontSize: 14, color: "#666" }}>
+            Enter your API keys below. These are stored locally in your browser and only used for this session.
+          </p>
+          <div style={{ marginTop: 12 }}>
+            <label style={{ display: "block", marginBottom: 8 }}>
+              <strong>OpenAI API Key:</strong>
+              <input
+                type="password"
+                value={apiTokens.openai}
+                onChange={(e) => setApiTokens({ ...apiTokens, openai: e.target.value })}
+                placeholder="sk-..."
+                style={{ width: "100%", padding: 8, marginTop: 4, borderRadius: 4, border: "1px solid #ccc" }}
+              />
+            </label>
+            <label style={{ display: "block", marginTop: 12, marginBottom: 8 }}>
+              <strong>Anthropic API Key:</strong>
+              <input
+                type="password"
+                value={apiTokens.anthropic}
+                onChange={(e) => setApiTokens({ ...apiTokens, anthropic: e.target.value })}
+                placeholder="sk-ant-..."
+                style={{ width: "100%", padding: 8, marginTop: 4, borderRadius: 4, border: "1px solid #ccc" }}
+              />
+            </label>
+            <label style={{ display: "block", marginTop: 12, marginBottom: 8 }}>
+              <strong>Google API Key:</strong>
+              <input
+                type="password"
+                value={apiTokens.google}
+                onChange={(e) => setApiTokens({ ...apiTokens, google: e.target.value })}
+                placeholder="AIza..."
+                style={{ width: "100%", padding: 8, marginTop: 4, borderRadius: 4, border: "1px solid #ccc" }}
+              />
+            </label>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 24 }}>
+          <label>
+            <strong>Your Prompt:</strong>
+            <br />
+            <textarea
+              value={userPrompt}
+              onChange={(e) => setUserPrompt(e.target.value)}
+              rows={4}
+              placeholder="Try one of the techniques you learned! For example: 'You are a high school science teacher. Your student is in 9th grade. Explain photosynthesis in simple terms with one real-world example.'"
+              style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 4, border: "1px solid #ccc", fontFamily: "inherit" }}
+            />
+          </label>
+        </div>
+
+        <button
+          onClick={handlePromptSubmit}
+          disabled={isLoading || !userPrompt.trim()}
+          style={{
+            marginTop: 16,
+            padding: "12px 24px",
+            backgroundColor: isLoading ? "#ccc" : "#0070f3",
+            color: "white",
+            border: "none",
+            borderRadius: 4,
+            cursor: isLoading ? "not-allowed" : "pointer",
+            fontSize: 16,
+          }}
+        >
+          {isLoading ? "Loading..." : "Submit to All LLMs"}
+        </button>
+
+        {(llmResponses.openai || llmResponses.anthropic || llmResponses.google) && (
+          <div style={{ marginTop: 32 }}>
+            <h3>Responses from Different LLMs:</h3>
+            
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16, marginTop: 16 }}>
+              {llmResponses.openai && (
+                <div style={{ padding: 16, border: "1px solid #ddd", borderRadius: 8, backgroundColor: "#fff" }}>
+                  <h4 style={{ marginTop: 0, color: "#0070f3" }}>OpenAI (GPT-4)</h4>
+                  {llmResponses.openai.error ? (
+                    <p style={{ color: "red" }}>Error: {llmResponses.openai.error}</p>
+                  ) : (
+                    <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{llmResponses.openai.response}</p>
+                  )}
+                </div>
+              )}
+
+              {llmResponses.anthropic && (
+                <div style={{ padding: 16, border: "1px solid #ddd", borderRadius: 8, backgroundColor: "#fff" }}>
+                  <h4 style={{ marginTop: 0, color: "#d4af37" }}>Anthropic (Claude)</h4>
+                  {llmResponses.anthropic.error ? (
+                    <p style={{ color: "red" }}>Error: {llmResponses.anthropic.error}</p>
+                  ) : (
+                    <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{llmResponses.anthropic.response}</p>
+                  )}
+                </div>
+              )}
+
+              {llmResponses.google && (
+                <div style={{ padding: 16, border: "1px solid #ddd", borderRadius: 8, backgroundColor: "#fff" }}>
+                  <h4 style={{ marginTop: 0, color: "#4285f4" }}>Google (Gemini)</h4>
+                  {llmResponses.google.error ? (
+                    <p style={{ color: "red" }}>Error: {llmResponses.google.error}</p>
+                  ) : (
+                    <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{llmResponses.google.response}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div style={{ marginTop: 32, padding: 16, backgroundColor: "#f0f8ff", borderRadius: 8 }}>
+          <h4>Tips for Comparing Responses:</h4>
+          <ul>
+            <li>Notice which model provides more detailed explanations</li>
+            <li>Compare how each model interprets your prompt</li>
+            <li>Think about which response is most helpful for your learning goal</li>
+            <li>Try refining your prompt and submitting again to see how responses change</li>
+          </ul>
+        </div>
+
+        <button
+          onClick={() => setStage("task")}
+          style={{ marginTop: 24, padding: "12px 24px", backgroundColor: "#28a745", color: "white", border: "none", borderRadius: 4, cursor: "pointer" }}
+        >
+          Continue to Writing Task
+        </button>
       </div>
     );
   }
@@ -365,40 +642,45 @@ export default function PromptStudy() {
           Please rate your agreement with each statement about your AI use in
           this activity (1=Strongly Disagree, 5=Strongly Agree).
         </p>
+        <div style={{ marginBottom: 20 }}>
         <div>
-          <label>
             <strong>1. I feel more confident writing effective AI prompts.</strong>
-            <br />
-            {renderLikert(postResponses.q1, (v) => setPostResponses({ ...postResponses, q1: v }))}
-          </label>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            {renderLikert(postResponses.q1, (v) => setPostResponses((prev) => ({ ...prev, q1: v })), "post-q1")}
+          </div>
         </div>
+        <div style={{ marginBottom: 20 }}>
         <div>
-          <label>
             <strong>2. I now ask AI for explanations or reasoning rather than just answers.</strong>
-            <br />
-            {renderLikert(postResponses.q2, (v) => setPostResponses({ ...postResponses, q2: v }))}
-          </label>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            {renderLikert(postResponses.q2, (v) => setPostResponses((prev) => ({ ...prev, q2: v })), "post-q2")}
+          </div>
         </div>
+        <div style={{ marginBottom: 20 }}>
         <div>
-          <label>
             <strong>3. The activity helped me understand how to learn with AI more effectively.</strong>
-            <br />
-            {renderLikert(postResponses.q3, (v) => setPostResponses({ ...postResponses, q3: v }))}
-          </label>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            {renderLikert(postResponses.q3, (v) => setPostResponses((prev) => ({ ...prev, q3: v })), "post-q3")}
+          </div>
         </div>
+        <div style={{ marginBottom: 20 }}>
         <div>
-          <label>
             <strong>4. I now think more critically about AI responses.</strong>
-            <br />
-            {renderLikert(postResponses.q4, (v) => setPostResponses({ ...postResponses, q4: v }))}
-          </label>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            {renderLikert(postResponses.q4, (v) => setPostResponses((prev) => ({ ...prev, q4: v })), "post-q4")}
+          </div>
         </div>
+        <div style={{ marginBottom: 20 }}>
         <div>
-          <label>
             <strong>5. I understand how to use AI ethically for schoolwork.</strong>
-            <br />
-            {renderLikert(postResponses.q5, (v) => setPostResponses({ ...postResponses, q5: v }))}
-          </label>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            {renderLikert(postResponses.q5, (v) => setPostResponses((prev) => ({ ...prev, q5: v })), "post-q5")}
+          </div>
         </div>
         <div style={{ marginTop: 16 }}>
           <label>
@@ -459,6 +741,7 @@ export default function PromptStudy() {
       {stage === "consent" && renderConsent()}
       {stage === "preSurvey" && renderPreSurvey()}
       {stage === "module" && renderModule()}
+      {stage === "promptPractice" && renderPromptPractice()}
       {stage === "task" && renderTask()}
       {stage === "postSurvey" && renderPostSurvey()}
       {stage === "complete" && renderComplete()}
