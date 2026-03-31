@@ -1,0 +1,78 @@
+Evaluators should classify a student’s prompt into one of these strategies by examining its structure and purpose.  For example, a prompt that begins “Let’s think step by step…” and asks for reasoning traces likely belongs to the CoT family.  A prompt that includes three example Q&A pairs is few‑shot; one that instructs the model to critique and revise its own answer is self‑refine.
+
+2. Grading the prompt
+
+Prompt evaluation has two parts: effectiveness and similarity to an optimized prompt.  Effectiveness reflects how well the prompt elicits high‑quality, relevant responses from the model; similarity measures how closely it matches an ideal or optimized prompt (e.g., one produced by an automatic optimizer or by the instructor).
+
+2.1 Effectiveness criteria
+	1.	Completeness and clarity – Does the prompt clearly specify the role, context and task?  The Prompty curriculum encourages students to decompose prompts into Role, Context and Task.  A high‑quality prompt identifies the model’s perspective (role), provides sufficient background (context), and articulates the desired outcome (task).
+	2.	Appropriate strategy – Is the chosen prompting strategy suitable for the task?  For example, multi‑step reasoning tasks benefit from CoT/ToT strategies, while tasks requiring updated factual information may need RAG or verification approaches.
+	3.	Specificity and constraints – The prompt should avoid ambiguity by specifying any formatting, length, or style constraints.  Vague prompts often yield generic outputs.
+	4.	Use of examples (if applicable) – In few‑shot prompts, examples should be relevant, diverse and instructive.  Poorly chosen examples can introduce bias or confusion.
+	5.	Iterative improvement – Following Prompty’s emphasis on reflection, students should iteratively refine their prompt based on previous outputs and analysis.  Evidence of revision (e.g., adjusting instructions after evaluating initial results) indicates thoughtful prompt engineering.
+
+Rate each criterion on a scale of 0–4 (0 = absent, 4 = excellent) and average the scores to obtain an effectiveness score.
+
+2.2 Similarity to the optimized prompt
+
+To compare a student’s prompt to a known optimized prompt (provided by the instructor or produced by an optimizer), compute a similarity score.  Possible approaches include:
+	•	Lexical overlap – Token‑level Jaccard or cosine similarity between the two prompts after stopword removal.  High overlap indicates that the student captured key instructions and constraints.
+	•	Semantic similarity – Embed both prompts using a sentence‑embedding model and compute cosine similarity.  This captures rephrased content with similar meaning.
+	•	Structural comparison – Check whether both prompts contain the same components (role, context, task) and whether they use the same prompting strategy.
+
+Scale the similarity score to 0–4, where 0 indicates little resemblance and 4 denotes near‑identical structure and intent.
+
+The prompt grade combines the effectiveness and similarity scores (e.g., averaged or weighted) to produce a 0–4 prompt quality rating.  Optionally, weight effectiveness more heavily (e.g., 70%) so that a creative but different prompt can still score well if it works effectively.
+
+3. Curriculum adherence
+
+The Stanford Prompty curriculum emphasizes not only prompt construction but also responsible and reflective use of LLMs.  When grading, assess how well students followed these pedagogical goals:
+	1.	Role–Context–Task structure – Does the student explicitly identify the role (e.g., “You are a journalist…”), provide context, and state the task?  Assign 0–2 points for each component (0 = missing, 1 = partial, 2 = complete), for a total of 0–6.
+	2.	Intentional iteration – Prompty limits the number of attempts and encourages reflection after each attempt.  Students should show evidence of analyzing prior outputs and revising their prompt.  Award up to 4 points for thoughtful iteration.
+	3.	Critical evaluation of outputs – The curriculum encourages comparing multiple model outputs and evaluating strengths and weaknesses.  Look for notes or reflections demonstrating that the student compared responses and justified revisions (0–4 points).
+	4.	Awareness of AI limitations and ethics – Did the student acknowledge potential hallucinations, biases or environmental impacts?  Recognizing that AI outputs need human judgment is part of the curriculum (0–4 points).
+
+Add these points to produce a curriculum adherence score out of 18.  Convert to a 0–4 scale (e.g., divide by 4.5) for comparability.
+
+4. Response rubric (200‑word synthesis)
+
+Students must write a short synthesis (~200 words) reflecting on their process or analyzing model outputs.  Borrowing inspiration from AP Language and Literature rubrics but simplifying for brevity, grade each response on three dimensions: factual accuracy & evidence, depth & insight, and human originality.  Structure and grammar are secondary because the focus is on content.
+	1.	Factual accuracy and use of evidence (0–4 points)
+	•	4 = Excellent – The response cites or paraphrases specific information from model outputs or sources to support its claims.  Facts are accurate and clearly connected to the prompt or curriculum.  Misstatements are absent or negligible.
+	•	3 = Good – Provides relevant evidence and mostly accurate facts but may omit minor details or include one minor inaccuracy.
+	•	2 = Adequate – Uses general statements or unspecific evidence; some inaccuracies or unsupported claims appear.
+	•	1 = Poor – Minimal evidence; facts are largely inaccurate or unsubstantiated.
+	•	0 = No evidence – Response is opinionated, off topic or incoherent.
+	2.	Depth and insight (0–4 points)
+	•	4 = Insightful – Demonstrates thoughtful analysis, considers multiple perspectives, and draws meaningful connections between the prompt, model behavior and curriculum goals.  Explores complexities or limitations.
+	•	3 = Competent – Shows some analysis and connects ideas, but lacks nuance or misses subtler issues.
+	•	2 = Basic – Restates observations without analysis or offers superficial commentary.
+	•	1 = Minimal – Briefly mentions ideas but shows little understanding or reflection.
+	•	0 = Absent – No meaningful discussion.
+	3.	Human originality vs. AI‑generated feel (0–4 points)
+	•	4 = Distinctly human – Writing shows personal voice, critical judgment and synthesis beyond typical AI patterns; acknowledges uncertainties or alternative interpretations.  The prose is not formulaic and includes novel insight.
+	•	3 = Mostly human – Some individuality and critique, but parts feel generic.
+	•	2 = Mixed – The response reads like a rephrased model output with limited personal input.
+	•	1 = Likely AI‑generated – Generic phrasing, exhaustive completeness without analysis, or unnatural coherence suggests the student relied heavily on the model.
+	•	0 = Unacceptable – Response appears entirely machine‑generated with no personal contribution.
+
+Add the three dimension scores (maximum 12) and rescale to 0–4 for the response grade.  This rubric aligns with the AP rubrics’ emphasis on thesis, evidence and sophistication but focuses on factual content and depth rather than essay organization.
+
+5. Computing overall results and comparisons
+
+For each student, compute:
+	•	Prompt strategy classification – Use the definitions above to label the strategy.
+	•	Prompt quality score (0–4) – Combine effectiveness and similarity.
+	•	Curriculum adherence score (0–4) – Based on role–context–task, iteration, evaluation, and ethics.
+	•	Response grade (0–4) – Based on the simplified essay rubric.
+
+You may also compute aggregate metrics (e.g., average prompt quality per strategy) and analyze correlations (e.g., do self‑refine prompts yield higher response grades?).  When comparing groups, use consistent scales and consider the number of attempts allowed by the curriculum.
+
+6. Using the framework
+	1.	Develop or select an optimized prompt for the task at hand (e.g., using Automatic Prompt Engineer or manual expert design).  This serves as the reference for similarity scoring.
+	2.	Collect student prompts and responses.  Note any revisions and reflections they provide.
+	3.	Classify each prompt, assign an effectiveness score, compute similarity to the optimized prompt, and evaluate curriculum adherence.
+	4.	Grade the response using the simplified rubric.  Provide narrative feedback highlighting strengths and areas for improvement.
+	5.	Analyze results to identify which strategies or instructional interventions lead to better outcomes.  Use findings to refine the curriculum and provide targeted feedback to students.
+
+This evaluation framework balances rigor with practical grading demands.  It leverages the taxonomy of prompt engineering techniques, integrates the role–context–task scaffolding from the Prompty curriculum, and adapts principles from AP rubrics to a shorter, content‑focused response.  By scoring prompts and responses across consistent dimensions, instructors can systematically quantify student progress and compare different strategies, while encouraging critical reflection and responsible use of AI.

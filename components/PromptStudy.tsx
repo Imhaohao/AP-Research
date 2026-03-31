@@ -1,6 +1,13 @@
 'use client'
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  CRAFT_ATTRIBUTION,
+  CRAFT_NARRATIVE_PROMPTS,
+  CRAFT_REVISION_SUGGESTIONS,
+  isCraftCurriculumPath,
+  type CraftPromptId,
+} from '@/lib/craftCurriculum';
 
 function formatOpenAiHelperError(message: string): string {
   const m = (message || '').trim();
@@ -21,12 +28,27 @@ function formatOpenAiHelperError(message: string): string {
  */
 export default function PromptStudy() {
   type Group = "control" | "treatment";
-  type Stage = "consent" | "preSurvey" | "module" | "task" | "postSurvey" | "complete";
+  type Stage =
+    | "consent"
+    | "preSurvey"
+    | "module"
+    | "task"
+    | "postSurvey"
+    | "complete"
+    | "craftIntro"
+    | "craftHuman"
+    | "craftAI"
+    | "craftCompare"
+    | "craftRevise"
+    | "craftReflect"
+    | "craftExit";
 
   // Randomly assign on first render
   const [group] = useState<Group>(() => {
     return Math.random() < 0.5 ? "control" : "treatment";
   });
+
+  const useCraftPath = isCraftCurriculumPath(group);
 
   const [stage, setStage] = useState<Stage>("consent");
   const [preResponses, setPreResponses] = useState({
@@ -94,6 +116,30 @@ export default function PromptStudy() {
   const [openAiLoading, setOpenAiLoading] = useState(false);
   const [openAiError, setOpenAiError] = useState('');
 
+  const [craftData, setCraftData] = useState({
+    icebreakerPriorKnowledge: '',
+    selectedPromptId: '' as '' | CraftPromptId,
+    humanNarrative: '',
+    aiNarrative: '',
+    compareToneVoice: '',
+    compareStructureOrg: '',
+    compareThreeDifferences: '',
+    compareHumanDidBetter: '',
+    compareAiDidBetter: '',
+    partnerShareReflection: '',
+    revisedNarrative: '',
+    discussStrengths: '',
+    discussLimitations: '',
+    discussOriginalVsAi: '',
+    discussBalanceCreativity: '',
+    exitBenefits: '',
+    exitChallenges: '',
+    commitmentStatement: '',
+    optionalHowToGuide: '',
+  });
+  const [craftAiLoading, setCraftAiLoading] = useState(false);
+  const [craftAiError, setCraftAiError] = useState('');
+
   const [sessionStartedAt] = useState(() => new Date().toISOString());
   const chatTurnIndexRef = useRef(0);
 
@@ -108,10 +154,15 @@ export default function PromptStudy() {
     return {
       client_submission_id: clientSubmissionId,
       study_group: group,
+      curriculum: useCraftPath ? 'stanford_craft_narrative_async' : 'default_prompt_study',
       session_started_at: sessionStartedAt,
       profile_captured_at: new Date().toISOString(),
       stage,
-      task_topic: taskData.topic,
+      task_topic: useCraftPath
+        ? craftData.selectedPromptId
+          ? `craft_narrative:${craftData.selectedPromptId}`
+          : 'craft_narrative'
+        : taskData.topic,
       consent_given: consent,
       school_gemini_link_configured: Boolean(schoolGeminiUrl),
       school_gemini_only_mode: schoolGeminiOnly,
@@ -133,6 +184,8 @@ export default function PromptStudy() {
     consent,
     schoolGeminiUrl,
     schoolGeminiOnly,
+    useCraftPath,
+    craftData.selectedPromptId,
   ]);
 
   const flushSubmission = useCallback(async () => {
@@ -142,6 +195,7 @@ export default function PromptStudy() {
       consent,
       pre_responses: preResponses,
       post_responses: postResponses,
+      craft_curriculum: useCraftPath ? craftData : null,
       task_data: taskData,
       practice_prompt: practicePrompt,
       practice_tries: practiceTries,
@@ -191,6 +245,8 @@ export default function PromptStudy() {
     schoolGeminiUrl,
     schoolGeminiOnly,
     buildSessionProfile,
+    useCraftPath,
+    craftData,
   ]);
 
   useEffect(() => {
@@ -201,29 +257,56 @@ export default function PromptStudy() {
     return () => clearTimeout(t);
   }, [stage, flushSubmission]);
 
-  // Get current step index for progress bar
-  const stages: Stage[] = ["consent", "preSurvey", "module", "task", "postSurvey", "complete"];
-  const currentStep = stages.indexOf(stage);
+  const flowStages: Stage[] = useCraftPath
+    ? [
+        'consent',
+        'preSurvey',
+        'craftIntro',
+        'craftHuman',
+        'craftAI',
+        'craftCompare',
+        'craftRevise',
+        'craftReflect',
+        'craftExit',
+        'postSurvey',
+        'complete',
+      ]
+    : ['consent', 'preSurvey', 'module', 'task', 'postSurvey', 'complete'];
+
+  const stageShortLabel: Record<Stage, string> = {
+    consent: 'Consent',
+    preSurvey: 'Pre',
+    module: 'Module',
+    task: 'Task',
+    craftIntro: 'Intro',
+    craftHuman: 'You write',
+    craftAI: 'AI story',
+    craftCompare: 'Compare',
+    craftRevise: 'Revise',
+    craftReflect: 'Discuss',
+    craftExit: 'Exit',
+    postSurvey: 'Post',
+    complete: 'Done',
+  };
+
+  const currentStep = flowStages.indexOf(stage);
 
   function renderProgressBar() {
+    const steps = flowStages.slice(0, -1);
     return (
       <div className="lms-progress">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
           <span style={{ fontSize: '0.875rem', color: '#666' }}>Progress</span>
           <span style={{ fontSize: '0.875rem', color: '#1a5490', fontWeight: '600' }}>
-            Step {currentStep + 1} of {stages.length - 1}
+            Step {currentStep < 0 ? 0 : currentStep + 1} of {steps.length}
           </span>
         </div>
         <div className="progress-bar">
-          {stages.slice(0, -1).map((s, index) => (
+          {steps.map((s, index) => (
             <div key={s} style={{ flex: 1 }}>
               <div className={`progress-step ${index <= currentStep ? 'active' : ''}`} />
-              <div className="progress-step-label">
-                {index === 0 && 'Consent'}
-                {index === 1 && 'Pre-Survey'}
-                {index === 2 && 'Module'}
-                {index === 3 && 'Task'}
-                {index === 4 && 'Post-Survey'}
+              <div className="progress-step-label" style={{ fontSize: '0.7rem' }}>
+                {stageShortLabel[s]}
               </div>
             </div>
           ))}
@@ -237,19 +320,31 @@ export default function PromptStudy() {
       <div className="lms-container">
         {renderProgressBar()}
         <div className="lms-card">
-          <h2>Welcome to the Prompt Engineering Study</h2>
+          <h2>Welcome {useCraftPath ? '— Narrative writing & AI (CRAFT-inspired)' : 'to the Prompt Engineering Study'}</h2>
           <p>
-            This activity explores how students can learn to communicate better with AI tools like ChatGPT. 
-            Your participation will help us understand effective teaching strategies for AI literacy.
+            {useCraftPath
+              ? 'You will work through an asynchronous lesson on how generative AI can support narrative writing: drafting, comparing your voice to an AI draft, revising with AI, and reflecting on ethics and craft.'
+              : 'This activity explores how students can learn to communicate better with AI tools like ChatGPT. Your participation will help us understand effective teaching strategies for AI literacy.'}
           </p>
           
           <h3>What to Expect</h3>
           <ul>
             <li>Complete a brief pre-survey about your AI experience</li>
-            <li>Review a short educational module (5 minutes)</li>
-            <li>Write a brief explanation on an unfamiliar topic</li>
-            <li>Complete a post-survey about your experience</li>
-            <li>Total time: approximately 45-60 minutes</li>
+            {useCraftPath ? (
+              <>
+                <li>Self-paced introduction and narrative drafting (your story, then an AI-generated story from the same prompt)</li>
+                <li>Compare voice, structure, and strengths; revise with AI; reflect as you would in a class discussion</li>
+                <li>Exit ticket and commitment statement, then a short post-survey</li>
+                <li>Total time: about 55–65 minutes (similar to a 60-minute CRAFT-style block, done on your own)</li>
+              </>
+            ) : (
+              <>
+                <li>Review a short educational module (5 minutes)</li>
+                <li>Write a brief explanation on an unfamiliar topic</li>
+                <li>Complete a post-survey about your experience</li>
+                <li>Total time: approximately 45-60 minutes</li>
+              </>
+            )}
           </ul>
 
           <h3>Your Privacy</h3>
@@ -380,8 +475,8 @@ export default function PromptStudy() {
             </label>
           </div>
 
-          <button onClick={() => setStage("module")}>
-            Continue to Module
+          <button onClick={() => setStage(useCraftPath ? 'craftIntro' : 'module')}>
+            {useCraftPath ? 'Continue to lesson intro' : 'Continue to Module'}
           </button>
         </div>
       </div>
@@ -618,6 +713,59 @@ export default function PromptStudy() {
     );
   }
 
+  async function generateCraftAINarrative() {
+    const def = CRAFT_NARRATIVE_PROMPTS.find((p) => p.id === craftData.selectedPromptId);
+    if (!def) return;
+    setCraftAiLoading(true);
+    setCraftAiError('');
+    const genPrompt = `You are a creative writing assistant. Write a short story of 1-2 paragraphs (about 150–280 words) responding to this prompt. Use vivid narrative voice and concrete details. Write only the story — no title line, no preamble.\n\nPrompt:\n${def.text}`;
+    try {
+      const response = await fetch('/api/llm/openai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: genPrompt,
+          apiKey: openAiApiKey.trim() || undefined,
+        }),
+      });
+      const data = (await response.json()) as {
+        response?: string;
+        model?: string;
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(
+          formatOpenAiHelperError(String(data.error || 'Failed to generate AI narrative'))
+        );
+      }
+      const assistantText = data.response ?? '';
+      setCraftData((d) => ({ ...d, aiNarrative: assistantText }));
+      setTaskData((t) => ({ ...t, usedAi: true }));
+
+      chatTurnIndexRef.current += 1;
+      void fetch('/api/study/log-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_submission_id: clientSubmissionId,
+          study_group: group,
+          turn_index: chatTurnIndexRef.current,
+          session_profile: buildSessionProfile(),
+          user_message: `[generate_ai_narrative] ${def.id}`,
+          full_prompt: genPrompt,
+          assistant_response: assistantText,
+          model: data.model ?? null,
+        }),
+      }).catch(() => {});
+    } catch (e) {
+      setCraftAiError(
+        e instanceof Error ? e.message : 'Could not generate. Check API billing or try again.'
+      );
+    } finally {
+      setCraftAiLoading(false);
+    }
+  }
+
   async function handleOpenAiMessage() {
     if (!openAiInput.trim()) {
       return;
@@ -632,7 +780,27 @@ export default function PromptStudy() {
     setOpenAiMessages(newMessages);
 
     try {
-      const systemPrompt = `You are a helpful writing assistant helping a student write a 200-250 word explanation for a 9th-grade student about: "${taskData.topic}".
+      const systemPrompt =
+        stage === 'craftRevise'
+          ? `You help students revise narrative fiction for a high school English class.
+
+The student's own draft (human-written) is:
+---
+${craftData.humanNarrative || '(not provided)'}
+---
+
+An AI-generated comparison draft from the same story prompt was:
+---
+${craftData.aiNarrative || '(not generated yet)'}
+---
+
+Their current working revision (they may paste updates here in chat or keep in the revision box) is:
+---
+${craftData.revisedNarrative || '(see notes in chat)'}
+---
+
+Respond to their requests: clarify vague details, grammar and sentences, expand sensory detail, strengthen voice, or tighten plot — while preserving their main ideas unless they ask to change them. Do not replace their voice with generic prose; prefer targeted edits and questions.`
+          : `You are a helpful writing assistant helping a student write a 200-250 word explanation for a 9th-grade student about: "${taskData.topic}".
 
 Your role is to:
 - Help them brainstorm ideas and structure their explanation
@@ -700,6 +868,528 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
     } finally {
       setOpenAiLoading(false);
     }
+  }
+
+  function craftNavCard(children: React.ReactNode, title: string, stepNote: string) {
+    return (
+      <div className="lms-container">
+        {renderProgressBar()}
+        <div className="lms-card">
+          <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.5rem' }}>{stepNote}</p>
+          <h2>{title}</h2>
+          {children}
+          <p style={{ marginTop: '1.5rem', fontSize: '0.8rem', color: '#555', fontStyle: 'italic' }}>
+            {CRAFT_ATTRIBUTION}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  function renderCraftIntro() {
+    return craftNavCard(
+      <>
+        <p style={{ marginBottom: '1rem' }}>
+          <strong>Lesson question:</strong> How can generative AI support narrative writing in English class? You will compare
+          human voice and tone to an AI draft, revise with AI support, and reflect on ethics and creativity — at your own pace.
+        </p>
+        <h3>Lesson objectives (async)</h3>
+        <ul>
+          <li>Compare human-written and AI-generated narratives</li>
+          <li>Identify strengths and limits of AI drafts (tone, structure, creativity)</li>
+          <li>Reflect on ethical use of tools like ChatGPT in creative work</li>
+        </ul>
+        <h3>Key ideas</h3>
+        <p>
+          <strong>Narrative writing</strong> · <strong>Generative AI</strong>
+        </p>
+        <div className="form-group" style={{ background: '#fff9e6', borderLeftColor: '#ffc107' }}>
+          <label>
+            <strong>Icebreaker (replacing sticky notes):</strong> What do you already know about using ChatGPT-style tools for writing?
+            <textarea
+              value={craftData.icebreakerPriorKnowledge}
+              onChange={(e) => setCraftData({ ...craftData, icebreakerPriorKnowledge: e.target.value })}
+              rows={3}
+              placeholder="Brainstorm briefly — e.g. brainstorming, grammar, when it helps or hurts your voice…"
+              style={{ marginTop: '0.5rem' }}
+            />
+          </label>
+        </div>
+        <p style={{ marginTop: '1rem' }}>
+          <strong>Why this matters:</strong> AI can support drafts and editing, but your judgment, voice, and ideas stay central.
+          Creative work also raises questions about honesty, originality, and when AI is appropriate.
+        </p>
+        <button type="button" onClick={() => setStage('craftHuman')} style={{ marginTop: '1rem' }}>
+          Continue to Activity 1 — your narrative →
+        </button>
+      </>,
+      'CRAFT-inspired lesson · Introduction (~10 min)',
+      'Self-paced · ~60 min total if you take your time on writing and reflection'
+    );
+  }
+
+  function renderCraftHuman() {
+    return craftNavCard(
+      <>
+        <p>
+          Choose <strong>one</strong> prompt. Write <strong>1–2 paragraphs</strong> of story (focus on creativity, not perfect
+          grammar). This replaces in-class independent writing.
+        </p>
+        <div style={{ display: 'grid', gap: '0.75rem', marginTop: '1rem' }}>
+          {CRAFT_NARRATIVE_PROMPTS.map((p) => (
+            <label
+              key={p.id}
+              style={{
+                display: 'flex',
+                gap: '0.75rem',
+                alignItems: 'flex-start',
+                padding: '0.75rem',
+                border:
+                  craftData.selectedPromptId === p.id ? '2px solid #1a5490' : '1px solid #ddd',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                background: craftData.selectedPromptId === p.id ? '#f0f7ff' : '#fff',
+              }}
+            >
+              <input
+                type="radio"
+                name="craft-prompt"
+                checked={craftData.selectedPromptId === p.id}
+                onChange={() => setCraftData({ ...craftData, selectedPromptId: p.id })}
+              />
+              <span>
+                <strong>{p.label}</strong>
+                <br />
+                <span style={{ fontSize: '0.9rem', color: '#444' }}>{p.text}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        <div className="form-group" style={{ marginTop: '1.25rem' }}>
+          <label>
+            <strong>Your narrative</strong>
+            <textarea
+              value={craftData.humanNarrative}
+              onChange={(e) => setCraftData({ ...craftData, humanNarrative: e.target.value })}
+              rows={10}
+              placeholder="Draft your short story here…"
+              style={{ marginTop: '0.5rem' }}
+            />
+          </label>
+        </div>
+        <button
+          type="button"
+          disabled={!craftData.selectedPromptId || !craftData.humanNarrative.trim()}
+          onClick={() => setStage('craftAI')}
+        >
+          Continue — generate AI version of the same prompt →
+        </button>
+      </>,
+      'Activity 1 · Developing narratives (~15 min)',
+      'Human draft first (matches CRAFT Activity 1)'
+    );
+  }
+
+  function renderCraftAI() {
+    const sel = CRAFT_NARRATIVE_PROMPTS.find((p) => p.id === craftData.selectedPromptId);
+    return craftNavCard(
+      <>
+        <p>
+          Now use <strong>the same prompt</strong> with generative AI. Here you can run the built-in ChatGPT API (or your
+          teacher&apos;s tool). Paste or edit the AI output below if you generated it elsewhere.
+        </p>
+        {sel && (
+          <div style={{ padding: '1rem', background: '#f5f5f5', borderRadius: '8px', marginTop: '0.75rem' }}>
+            <strong>Selected prompt:</strong> {sel.text}
+          </div>
+        )}
+        {!schoolGeminiOnly ? (
+          <div className="form-group" style={{ marginTop: '1rem' }}>
+            <label>
+              <strong>OpenAI API key (optional)</strong> if your teacher didn&apos;t set a server key:
+              <input
+                type="password"
+                value={openAiApiKey}
+                onChange={(e) => setOpenAiApiKey(e.target.value)}
+                style={{ marginTop: '0.5rem' }}
+              />
+            </label>
+            {craftAiError && (
+              <p style={{ color: '#c62828', fontSize: '0.9rem', marginTop: '0.5rem' }}>{craftAiError}</p>
+            )}
+            <button
+              type="button"
+              onClick={() => void generateCraftAINarrative()}
+              disabled={craftAiLoading || !craftData.selectedPromptId}
+              style={{ marginTop: '0.75rem' }}
+            >
+              {craftAiLoading ? 'Generating…' : 'Generate AI story with same prompt'}
+            </button>
+          </div>
+        ) : (
+          <p style={{ marginTop: '1rem', color: '#666' }}>
+            Built-in generation is off (<code>GEMINI_SCHOOL_ONLY</code>). Use your school tool, then paste the AI story below.
+          </p>
+        )}
+        {schoolGeminiUrl ? (
+          <p style={{ marginTop: '0.75rem' }}>
+            <a href={schoolGeminiUrl} target="_blank" rel="noopener noreferrer">
+              Open school Gemini in a new tab
+            </a>
+          </p>
+        ) : null}
+        <div className="form-group" style={{ marginTop: '1rem' }}>
+          <label>
+            <strong>AI-generated story</strong> (edit if needed)
+            <textarea
+              value={craftData.aiNarrative}
+              onChange={(e) => setCraftData({ ...craftData, aiNarrative: e.target.value })}
+              rows={10}
+              placeholder="Generated text appears here, or paste from ChatGPT / Gemini…"
+              style={{ marginTop: '0.5rem' }}
+            />
+          </label>
+        </div>
+        <button
+          type="button"
+          disabled={!craftData.aiNarrative.trim()}
+          onClick={() => setStage('craftCompare')}
+        >
+          Continue to comparison (graphic organizer) →
+        </button>
+      </>,
+      'Activity 1 (continued) · AI narrative',
+      'Pair: your draft + AI draft from the same prompt'
+    );
+  }
+
+  function renderCraftCompare() {
+    return craftNavCard(
+      <>
+        <p>
+          <strong>Activity 2 · Graphic organizer (async)</strong> — Compare your piece with the AI&apos;s. In class you might
+          share with a partner; here, jot notes as if you were explaining to a partner.
+        </p>
+        <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: '1fr 1fr', marginTop: '1rem' }}>
+          <div style={{ padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px', maxHeight: '200px', overflow: 'auto' }}>
+            <strong>Your narrative</strong>
+            <p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9rem' }}>{craftData.humanNarrative || '—'}</p>
+          </div>
+          <div style={{ padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px', maxHeight: '200px', overflow: 'auto' }}>
+            <strong>AI narrative</strong>
+            <p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9rem' }}>{craftData.aiNarrative || '—'}</p>
+          </div>
+        </div>
+        <div className="form-group">
+          <label>
+            <strong>Tone & voice — how do the two pieces compare?</strong>
+            <textarea
+              value={craftData.compareToneVoice}
+              onChange={(e) => setCraftData({ ...craftData, compareToneVoice: e.target.value })}
+              rows={3}
+              style={{ marginTop: '0.5rem' }}
+            />
+          </label>
+        </div>
+        <div className="form-group">
+          <label>
+            <strong>Structure & organization; grammar/spelling observations</strong>
+            <textarea
+              value={craftData.compareStructureOrg}
+              onChange={(e) => setCraftData({ ...craftData, compareStructureOrg: e.target.value })}
+              rows={3}
+              style={{ marginTop: '0.5rem' }}
+            />
+          </label>
+        </div>
+        <div className="form-group">
+          <label>
+            <strong>Three differences between the two pieces</strong>
+            <textarea
+              value={craftData.compareThreeDifferences}
+              onChange={(e) => setCraftData({ ...craftData, compareThreeDifferences: e.target.value })}
+              rows={3}
+              style={{ marginTop: '0.5rem' }}
+            />
+          </label>
+        </div>
+        <div className="form-group">
+          <label>
+            <strong>What did you do more effectively than the AI?</strong>
+            <textarea
+              value={craftData.compareHumanDidBetter}
+              onChange={(e) => setCraftData({ ...craftData, compareHumanDidBetter: e.target.value })}
+              rows={2}
+              placeholder="Your strengths…"
+              style={{ marginTop: '0.5rem' }}
+            />
+          </label>
+        </div>
+        <div className="form-group">
+          <label>
+            <strong>What did the AI do better than you?</strong>
+            <textarea
+              value={craftData.compareAiDidBetter}
+              onChange={(e) => setCraftData({ ...craftData, compareAiDidBetter: e.target.value })}
+              rows={2}
+              placeholder="AI strengths…"
+              style={{ marginTop: '0.5rem' }}
+            />
+          </label>
+        </div>
+        <div className="form-group">
+          <label>
+            <strong>Partner-style reflection (optional)</strong> — What might you have said in a turn-and-talk?
+            <textarea
+              value={craftData.partnerShareReflection}
+              onChange={(e) => setCraftData({ ...craftData, partnerShareReflection: e.target.value })}
+              rows={3}
+              style={{ marginTop: '0.5rem' }}
+            />
+          </label>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setOpenAiMessages([]);
+            setStage('craftRevise');
+          }}
+        >
+          Continue to revising with AI →
+        </button>
+      </>,
+      'Activity 2 · Compare & reflect (~10 min)',
+      'Digital graphic organizer'
+    );
+  }
+
+  function renderCraftRevise() {
+    return craftNavCard(
+      <>
+        <p>
+          <strong>Activity 3 · Revise with AI.</strong> Edit your <em>own</em> narrative below. Use the chat to ask for help
+          (clarify details, grammar, richer scenes, length) — try several prompts like the lesson suggests.
+        </p>
+        <div className="form-group">
+          <label>
+            <strong>Your revised narrative</strong>
+            <textarea
+              value={craftData.revisedNarrative}
+              onChange={(e) => setCraftData({ ...craftData, revisedNarrative: e.target.value })}
+              rows={10}
+              placeholder="Start from your original draft and revise here. You can paste AI-suggested text only where you choose…"
+              style={{ marginTop: '0.5rem' }}
+            />
+          </label>
+        </div>
+        <p style={{ fontSize: '0.9rem' }}>Quick prompt ideas:</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+          {CRAFT_REVISION_SUGGESTIONS.map((s) => (
+            <button key={s} type="button" className="button-secondary" onClick={() => setOpenAiInput(s)}>
+              {s}
+            </button>
+          ))}
+        </div>
+        {!schoolGeminiOnly ? (
+          <div
+            style={{
+              padding: '1.5rem',
+              background: '#f6faf8',
+              borderRadius: '8px',
+              border: '2px solid #10a37f',
+              marginTop: '1rem',
+            }}
+          >
+            <h3 style={{ marginTop: 0, color: '#0d8f6e' }}>ChatGPT · revision chat</h3>
+            <p style={{ fontSize: '0.9rem' }}>
+              The assistant sees your human draft, the AI comparison draft, and your revision box. Ask step by step.
+            </p>
+            <div className="form-group" style={{ background: '#fff' }}>
+              <label>
+                API key (optional)
+                <input
+                  type="password"
+                  value={openAiApiKey}
+                  onChange={(e) => setOpenAiApiKey(e.target.value)}
+                  style={{ marginTop: '0.25rem' }}
+                />
+              </label>
+            </div>
+            <div
+              style={{
+                background: '#fff',
+                borderRadius: '6px',
+                border: '1px solid #e0e0e0',
+                maxHeight: '280px',
+                display: 'flex',
+                flexDirection: 'column',
+                marginTop: '0.5rem',
+              }}
+            >
+              <div style={{ padding: '0.75rem', overflowY: 'auto', flex: 1, maxHeight: '200px' }}>
+                {openAiMessages.map((msg, idx) => (
+                  <div key={idx} style={{ marginBottom: '0.75rem' }}>
+                    <strong style={{ fontSize: '0.8rem', color: '#666' }}>
+                      {msg.role === 'user' ? 'You' : 'ChatGPT'}
+                    </strong>
+                    <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.9rem' }}>{msg.content}</div>
+                  </div>
+                ))}
+                {openAiLoading && <em>Thinking…</em>}
+              </div>
+              {openAiError && (
+                <div style={{ padding: '0.5rem', background: '#ffebee', color: '#c62828', fontSize: '0.85rem' }}>
+                  {openAiError}
+                </div>
+              )}
+              <div style={{ padding: '0.5rem', display: 'flex', gap: '0.5rem', borderTop: '1px solid #eee' }}>
+                <textarea
+                  value={openAiInput}
+                  onChange={(e) => setOpenAiInput(e.target.value)}
+                  rows={2}
+                  style={{ flex: 1, resize: 'none' }}
+                  disabled={openAiLoading}
+                  placeholder="Ask for a targeted revision…"
+                />
+                <button type="button" disabled={openAiLoading || !openAiInput.trim()} onClick={() => void handleOpenAiMessage()}>
+                  Send
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        <p style={{ marginTop: '1rem', fontSize: '0.9rem' }}>
+          <strong>Reflection (pair discussion — solo):</strong> What improved after AI help? How do you feel about those
+          changes?
+        </p>
+        <button type="button" onClick={() => setStage('craftReflect')} style={{ marginTop: '1rem' }}>
+          Continue to whole-class-style discussion prompts →
+        </button>
+      </>,
+      'Activity 3 · Revise with AI (~10 min)',
+      'Iterate like in-class guided exploration'
+    );
+  }
+
+  function renderCraftReflect() {
+    return craftNavCard(
+      <>
+        <p>
+          <strong>Activity 4 · Discussion</strong> (async — respond as you would in a circle)
+        </p>
+        <div className="form-group">
+          <label>
+            <strong>Strengths of using ChatGPT-style tools for narrative writing?</strong>
+            <textarea
+              value={craftData.discussStrengths}
+              onChange={(e) => setCraftData({ ...craftData, discussStrengths: e.target.value })}
+              rows={3}
+              style={{ marginTop: '0.5rem' }}
+            />
+          </label>
+        </div>
+        <div className="form-group">
+          <label>
+            <strong>Limitations you noticed?</strong>
+            <textarea
+              value={craftData.discussLimitations}
+              onChange={(e) => setCraftData({ ...craftData, discussLimitations: e.target.value })}
+              rows={3}
+              style={{ marginTop: '0.5rem' }}
+            />
+          </label>
+        </div>
+        <div className="form-group">
+          <label>
+            <strong>How much of your original ideas stayed in the revised piece vs how much felt AI-driven?</strong>
+            <textarea
+              value={craftData.discussOriginalVsAi}
+              onChange={(e) => setCraftData({ ...craftData, discussOriginalVsAi: e.target.value })}
+              rows={3}
+              style={{ marginTop: '0.5rem' }}
+            />
+          </label>
+        </div>
+        <div className="form-group">
+          <label>
+            <strong>How can AI support your writing without replacing your creativity?</strong>
+            <textarea
+              value={craftData.discussBalanceCreativity}
+              onChange={(e) => setCraftData({ ...craftData, discussBalanceCreativity: e.target.value })}
+              rows={3}
+              style={{ marginTop: '0.5rem' }}
+            />
+          </label>
+        </div>
+        <button type="button" onClick={() => setStage('craftExit')}>
+          Continue to exit ticket →
+        </button>
+      </>,
+      'Activity 4 · Reflect (~10 min)',
+      'Whole-group prompts in writing'
+    );
+  }
+
+  function renderCraftExit() {
+    return craftNavCard(
+      <>
+        <p>
+          <strong>Exit ticket & commitment (~5 min)</strong>
+        </p>
+        <div className="form-group">
+          <label>
+            <strong>Two benefits of using AI to support narrative writing</strong>
+            <textarea
+              value={craftData.exitBenefits}
+              onChange={(e) => setCraftData({ ...craftData, exitBenefits: e.target.value })}
+              rows={3}
+              style={{ marginTop: '0.5rem' }}
+            />
+          </label>
+        </div>
+        <div className="form-group">
+          <label>
+            <strong>Two challenges or risks</strong>
+            <textarea
+              value={craftData.exitChallenges}
+              onChange={(e) => setCraftData({ ...craftData, exitChallenges: e.target.value })}
+              rows={3}
+              style={{ marginTop: '0.5rem' }}
+            />
+          </label>
+        </div>
+        <div className="form-group">
+          <label>
+            <strong>Personal commitment</strong> — How will you use AI for writing? What will you <em>not</em> outsource (e.g.
+            voice, emotional truth)?
+            <textarea
+              value={craftData.commitmentStatement}
+              onChange={(e) => setCraftData({ ...craftData, commitmentStatement: e.target.value })}
+              rows={4}
+              placeholder='Example: "I will use AI for grammar feedback, not for inventing my plot."'
+              style={{ marginTop: '0.5rem' }}
+            />
+          </label>
+        </div>
+        <div className="form-group" style={{ background: '#f9f9f9' }}>
+          <label>
+            <strong>Optional extension · “How-to” guide</strong> (homework-style)
+            <textarea
+              value={craftData.optionalHowToGuide}
+              onChange={(e) => setCraftData({ ...craftData, optionalHowToGuide: e.target.value })}
+              rows={4}
+              placeholder="Steps, pitfalls, what humans do better, best AI supports…"
+              style={{ marginTop: '0.5rem' }}
+            />
+          </label>
+        </div>
+        <button type="button" onClick={() => setStage('postSurvey')}>
+          Continue to post-survey →
+        </button>
+      </>,
+      'Exit ticket & commitment',
+      'Almost done — research post-survey next'
+    );
   }
 
   function renderTask() {
@@ -1174,6 +1864,13 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
       {stage === "preSurvey" && renderPreSurvey()}
       {stage === "module" && renderModule()}
       {stage === "task" && renderTask()}
+      {stage === "craftIntro" && renderCraftIntro()}
+      {stage === "craftHuman" && renderCraftHuman()}
+      {stage === "craftAI" && renderCraftAI()}
+      {stage === "craftCompare" && renderCraftCompare()}
+      {stage === "craftRevise" && renderCraftRevise()}
+      {stage === "craftReflect" && renderCraftReflect()}
+      {stage === "craftExit" && renderCraftExit()}
       {stage === "postSurvey" && renderPostSurvey()}
       {stage === "complete" && renderComplete()}
     </div>
