@@ -9,9 +9,9 @@ export default function Home() {
   const [accessCode, setAccessCode] = useState("");
   const [accessCodeError, setAccessCodeError] = useState("");
   const [hasAccess, setHasAccess] = useState(false);
-  const [participantEmail, setParticipantEmail] = useState("");
-  const [participantEmailError, setParticipantEmailError] = useState("");
-  const [hasParticipantEmail, setHasParticipantEmail] = useState(false);
+  const [participantLoginId, setParticipantLoginId] = useState("");
+  const [participantLoginIdError, setParticipantLoginIdError] = useState("");
+  const [hasParticipantLoginId, setHasParticipantLoginId] = useState(false);
 
   function handleAccessCodeSubmit() {
     if (accessCode.trim().toUpperCase() === VALID_ACCESS_CODE.toUpperCase()) {
@@ -22,18 +22,19 @@ export default function Home() {
     }
   }
 
-  function handleParticipantEmailSubmit() {
-    const raw = participantEmail.trim();
+  function handleParticipantLoginSubmit() {
+    const raw = participantLoginId.trim().toUpperCase();
     if (!raw) {
-      setParticipantEmailError("Please enter your email.");
+      setParticipantLoginIdError("Please enter your participant login ID.");
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) {
-      setParticipantEmailError("Please enter a valid email address.");
+    if (!/^APR\d{3}$/.test(raw)) {
+      setParticipantLoginIdError("Use the format APR### (example: APR001).");
       return;
     }
-    setParticipantEmailError("");
-    setHasParticipantEmail(true);
+    setParticipantLoginId(raw);
+    setParticipantLoginIdError("");
+    setHasParticipantLoginId(true);
   }
 
   if (!hasAccess) {
@@ -100,57 +101,58 @@ export default function Home() {
     );
   }
 
-  if (!hasParticipantEmail) {
+  if (!hasParticipantLoginId) {
     return (
       <div style={{ fontFamily: "sans-serif", padding: 16, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ maxWidth: 600, width: "100%" }}>
           <h2>Participant Info</h2>
-          <p>Please enter your participant email to continue.</p>
+          <p>Please enter your participant login ID to continue.</p>
           <div style={{ marginTop: 24 }}>
             <label>
-              <strong>Email:</strong>
+              <strong>Participant Login ID:</strong>
               <br />
               <input
-                type="email"
-                value={participantEmail}
+                type="text"
+                value={participantLoginId}
                 onChange={(e) => {
-                  setParticipantEmail(e.target.value);
-                  setParticipantEmailError("");
+                  setParticipantLoginId(e.target.value.toUpperCase());
+                  setParticipantLoginIdError("");
                 }}
                 onKeyPress={(e) => {
                   if (e.key === "Enter") {
-                    handleParticipantEmailSubmit();
+                    handleParticipantLoginSubmit();
                   }
                 }}
-                placeholder="name@example.com"
+                placeholder="APR001"
                 style={{
                   width: "100%",
                   padding: 12,
                   marginTop: 8,
                   fontSize: 16,
                   borderRadius: 4,
-                  border: participantEmailError ? "2px solid #dc3545" : "1px solid #ccc",
+                  border: participantLoginIdError ? "2px solid #dc3545" : "1px solid #ccc",
+                  textTransform: "uppercase",
                 }}
                 autoFocus
               />
             </label>
-            {participantEmailError && (
+            {participantLoginIdError && (
               <p style={{ color: "#dc3545", marginTop: 8, fontSize: 14 }}>
-                {participantEmailError}
+                {participantLoginIdError}
               </p>
             )}
           </div>
           <button
-            onClick={handleParticipantEmailSubmit}
-            disabled={!participantEmail.trim()}
+            onClick={handleParticipantLoginSubmit}
+            disabled={!participantLoginId.trim()}
             style={{
               marginTop: 16,
               padding: "12px 24px",
-              backgroundColor: participantEmail.trim() ? "#0070f3" : "#ccc",
+              backgroundColor: participantLoginId.trim() ? "#0070f3" : "#ccc",
               color: "white",
               border: "none",
               borderRadius: 4,
-              cursor: participantEmail.trim() ? "pointer" : "not-allowed",
+              cursor: participantLoginId.trim() ? "pointer" : "not-allowed",
               fontSize: 16,
             }}
           >
@@ -159,9 +161,9 @@ export default function Home() {
           <button
             onClick={() => {
               setHasAccess(false);
-              setHasParticipantEmail(false);
-              setParticipantEmail("");
-              setParticipantEmailError("");
+              setHasParticipantLoginId(false);
+              setParticipantLoginId("");
+              setParticipantLoginIdError("");
               setAccessCode("");
               setAccessCodeError("");
             }}
@@ -184,7 +186,7 @@ export default function Home() {
     );
   }
 
-  return <PromptStudy participantEmail={participantEmail.trim()} />;
+  return <PromptStudy participantLoginId={participantLoginId.trim().toUpperCase()} />;
 }
 
 

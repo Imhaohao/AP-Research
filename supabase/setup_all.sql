@@ -16,6 +16,7 @@ create table if not exists public.study_results (
   treatment_arm smallint,
   participant_sequence bigint,
   participant_email text,
+  participant_login_id text,
   data jsonb not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -73,6 +74,28 @@ create policy "study_chat_turns_anon_insert"
   on public.study_chat_turns for insert
   to anon
   with check (true);
+
+-- ========== participant roster (login IDs + baseline survey) ==========
+create table if not exists public.study_participants (
+  login_id text primary key,
+  email text unique not null,
+  full_name text not null,
+  available_prime boolean not null default false,
+  grade text not null,
+  likert jsonb not null,
+  free_response jsonb not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.study_participants enable row level security;
+
+alter table public.study_results
+  drop constraint if exists study_results_participant_login_id_fkey;
+
+alter table public.study_results
+  add constraint study_results_participant_login_id_fkey
+  foreign key (participant_login_id) references public.study_participants(login_id);
 
 -- ========== systematic 3-arm sequence (atomic with service role + RPC) ==========
 create table if not exists public.study_participant_sequence (

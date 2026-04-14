@@ -33,7 +33,13 @@ function formatOpenAiHelperError(message: string): string {
  * assigned systematically (3 AI-use arms via Supabase order) or, in legacy mode,
  * to control vs treatment. Results are sent to Supabase when the participant reaches the thank‑you screen.
  */
-export default function PromptStudy({ participantEmail }: { participantEmail?: string }) {
+export default function PromptStudy({
+  participantEmail,
+  participantLoginId,
+}: {
+  participantEmail?: string;
+  participantLoginId?: string;
+}) {
   type Stage =
     | "consent"
     | "preSurvey"
@@ -222,6 +228,7 @@ export default function PromptStudy({ participantEmail }: { participantEmail?: s
     return {
       client_submission_id: clientSubmissionId,
       participant_email: participantEmail ?? null,
+      participant_login_id: participantLoginId ?? null,
       study_group: effectiveStudyGroup,
       treatment_arm: legacyTwoArm ? null : treatmentArm,
       participant_sequence: legacyTwoArm ? null : participantSequence,
@@ -267,6 +274,7 @@ export default function PromptStudy({ participantEmail }: { participantEmail?: s
     setSaveMessage('');
     const data: Record<string, unknown> = {
       participant_email: participantEmail ?? null,
+      participant_login_id: participantLoginId ?? null,
       consent,
       pre_responses: preResponses,
       post_responses: postResponses,
@@ -328,6 +336,7 @@ export default function PromptStudy({ participantEmail }: { participantEmail?: s
     useCraftPath,
     craftData,
     participantEmail,
+    participantLoginId,
   ]);
 
   useEffect(() => {
