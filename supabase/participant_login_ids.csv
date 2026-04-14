@@ -1,0 +1,20 @@
+login_id,access_code,full_name,email,available_prime,grade
+APR001,AC0001,Alice Sheffer,as35295@pausd.us,false,Senior
+APR002,AC0002,Lydia Wang,lw41022@pausd.us,false,Junior
+APR003,AC0003,Anita Schauenberg,as47396@pausd.us,true,Sophomore
+APR004,AC0004,Aeshaan Singhal,as49256@pausd.us,true,Junior
+APR005,AC0005,Julia Nunes,jn51909@pausd.us,true,Junior
+APR006,AC0006,Drake Quiec,dq57415@pausd.us,true,Freshman
+APR007,AC0007,Motoko Iwata,mi47685@pausd.us,false,Senior
+APR008,AC0008,Max Soparkar,ms35802@pausd.us,true,Senior
+APR009,AC0009,Kexuan Chen,kc55367@pausd.us,true,Freshman
+APR010,AC0010,Emma Gee,eg33427@pausd.us,false,Senior
+APR011,AC0011,Edward Chen,ec39209@pausd.us,true,Sophomore
+APR012,AC0012,Matthew Hong,matthewjjhong@gmail.com,true,Sophomore
+APR013,AC0013,Grace Hawes,grace.enrong@icloud.com,true,Sophomore
+APR014,AC0014,Dalia Saal,ds54891@pausd.us,false,Junior
+APR015,AC0015,Lily Cai,yueyue1149@outlook.com,true,Freshman
+APR016,AC0016,Jiayi Wang,jw37952@pausd.us,true,Junior
+APR017,AC0017,Viv Bojinov,vb47036@pausd.us,false,Freshman
+APR018,AC0018,Nathan Lee,nathanhlee1@gmail.com,false,Senior
+APR019,AC0019,Asher Carlson,ac58441@pausd.us,false,Freshman

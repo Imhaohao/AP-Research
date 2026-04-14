@@ -5,6 +5,7 @@ create table if not exists public.study_results (
   study_group text not null check (study_group in ('control', 'treatment')),
   participant_email text,
   participant_login_id text,
+  lottery_opt_in boolean,
   data jsonb not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

@@ -68,6 +68,10 @@ export async function POST(request: NextRequest) {
     typeof data.participant_login_id === 'string'
       ? data.participant_login_id.trim().toUpperCase() || null
       : null;
+  const lotteryOptIn =
+    typeof data.lottery_opt_in === 'boolean'
+      ? data.lottery_opt_in
+      : null;
 
   const row: Record<string, unknown> = {
     client_submission_id,
@@ -76,6 +80,7 @@ export async function POST(request: NextRequest) {
     updated_at: now,
     participant_email: participantEmail,
     participant_login_id: participantLoginId,
+    lottery_opt_in: lotteryOptIn,
   };
   if (treatment_arm !== undefined && treatment_arm !== null) {
     row.treatment_arm = treatment_arm;
