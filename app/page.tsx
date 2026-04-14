@@ -1,192 +1,108 @@
 'use client'
 
-import { useState } from 'react'
-import PromptStudy from '@/components/PromptStudy'
+import Link from 'next/link';
+import { useState } from 'react';
+import PromptStudy from '@/components/PromptStudy';
 
-const VALID_ACCESS_CODE = "PROMPTINGSUCCESS";
+type AccessResolveResponse = {
+  login_id: string;
+  email: string;
+  full_name?: string;
+  error?: string;
+};
 
 export default function Home() {
-  const [accessCode, setAccessCode] = useState("");
-  const [accessCodeError, setAccessCodeError] = useState("");
-  const [hasAccess, setHasAccess] = useState(false);
-  const [participantLoginId, setParticipantLoginId] = useState("");
-  const [participantLoginIdError, setParticipantLoginIdError] = useState("");
-  const [hasParticipantLoginId, setHasParticipantLoginId] = useState(false);
+  const [accessCode, setAccessCode] = useState('');
+  const [accessCodeError, setAccessCodeError] = useState('');
+  const [isResolvingCode, setIsResolvingCode] = useState(false);
+  const [participantLoginId, setParticipantLoginId] = useState('');
+  const [participantEmail, setParticipantEmail] = useState('');
 
-  function handleAccessCodeSubmit() {
-    if (accessCode.trim().toUpperCase() === VALID_ACCESS_CODE.toUpperCase()) {
-      setAccessCodeError("");
-      setHasAccess(true);
-    } else {
-      setAccessCodeError("Invalid access code. Please try again.");
+  async function handleAccessCodeSubmit() {
+    const code = accessCode.trim().toUpperCase();
+    if (!code) {
+      setAccessCodeError('Please enter your access code.');
+      return;
+    }
+
+    try {
+      setIsResolvingCode(true);
+      setAccessCodeError('');
+      const response = await fetch('/api/study/resolve-access-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_code: code }),
+      });
+      const json = (await response.json()) as AccessResolveResponse;
+      if (!response.ok || !json.login_id) {
+        throw new Error(json.error || 'Invalid access code.');
+      }
+      setParticipantLoginId(json.login_id);
+      setParticipantEmail(json.email);
+    } catch (error) {
+      setAccessCodeError(error instanceof Error ? error.message : 'Could not validate access code.');
+    } finally {
+      setIsResolvingCode(false);
     }
   }
 
-  function handleParticipantLoginSubmit() {
-    const raw = participantLoginId.trim().toUpperCase();
-    if (!raw) {
-      setParticipantLoginIdError("Please enter your participant login ID.");
-      return;
-    }
-    if (!/^APR\d{3}$/.test(raw)) {
-      setParticipantLoginIdError("Use the format APR### (example: APR001).");
-      return;
-    }
-    setParticipantLoginId(raw);
-    setParticipantLoginIdError("");
-    setHasParticipantLoginId(true);
-  }
-
-  if (!hasAccess) {
+  if (!participantLoginId) {
     return (
-      <div style={{ fontFamily: "sans-serif", padding: 16, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ maxWidth: 600, width: "100%" }}>
-          <h2>Access Code Required</h2>
-          <p>
-            Thank you for your interest for participating in this AP Research study. Please enter the access code provided by zy53492@pausd.us to participate in this study.
+      <main className="auth-shell">
+        <section className="auth-card" aria-labelledby="access-code-heading">
+          <p className="auth-eyebrow">AP Research Experiment</p>
+          <h1 id="access-code-heading">Enter your access code</h1>
+          <p className="auth-subtext">
+            Use the code sent to your email to begin the experiment. Your responses are saved anonymously for research.
           </p>
-          <div style={{ marginTop: 24 }}>
-            <label>
-              <strong>Access Code:</strong>
-              <br />
-              <input
-                type="text"
-                value={accessCode}
-                onChange={(e) => {
-                  setAccessCode(e.target.value);
-                  setAccessCodeError("");
-                }}
-                onKeyPress={(e) => {
-                  if (e.key === "Enter") {
-                    handleAccessCodeSubmit();
-                  }
-                }}
-                placeholder="Enter access code"
-                style={{
-                  width: "100%",
-                  padding: 12,
-                  marginTop: 8,
-                  fontSize: 16,
-                  borderRadius: 4,
-                  border: accessCodeError ? "2px solid #dc3545" : "1px solid #ccc",
-                  textTransform: "uppercase",
-                }}
-                autoFocus
-              />
-            </label>
-            {accessCodeError && (
-              <p style={{ color: "#dc3545", marginTop: 8, fontSize: 14 }}>
+          <div className="auth-field">
+            <label htmlFor="access-code-input">Access code</label>
+            <input
+              id="access-code-input"
+              type="text"
+              value={accessCode}
+              onChange={(e) => {
+                setAccessCode(e.target.value.toUpperCase());
+                setAccessCodeError('');
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  void handleAccessCodeSubmit();
+                }
+              }}
+              placeholder="Example: 7Q4M9K2P"
+              autoComplete="off"
+              autoFocus
+            />
+            {accessCodeError ? (
+              <p className="auth-error" role="alert">
                 {accessCodeError}
               </p>
-            )}
+            ) : null}
           </div>
           <button
-            onClick={handleAccessCodeSubmit}
-            disabled={!accessCode.trim()}
-            style={{
-              marginTop: 16,
-              padding: "12px 24px",
-              backgroundColor: accessCode.trim() ? "#0070f3" : "#ccc",
-              color: "white",
-              border: "none",
-              borderRadius: 4,
-              cursor: accessCode.trim() ? "pointer" : "not-allowed",
-              fontSize: 16,
-            }}
+            type="button"
+            onClick={() => void handleAccessCodeSubmit()}
+            disabled={isResolvingCode || !accessCode.trim()}
+            className="auth-submit"
           >
-            Continue
+            {isResolvingCode ? 'Checking code...' : 'Continue to study'}
           </button>
-        </div>
-      </div>
+          <p className="auth-footnote">
+            Don&apos;t have an accesscode and want to participate?{' '}
+            <Link href="/signup">Sign up here</Link>.
+          </p>
+        </section>
+      </main>
     );
   }
 
-  if (!hasParticipantLoginId) {
-    return (
-      <div style={{ fontFamily: "sans-serif", padding: 16, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ maxWidth: 600, width: "100%" }}>
-          <h2>Participant Info</h2>
-          <p>Please enter your participant login ID to continue.</p>
-          <div style={{ marginTop: 24 }}>
-            <label>
-              <strong>Participant Login ID:</strong>
-              <br />
-              <input
-                type="text"
-                value={participantLoginId}
-                onChange={(e) => {
-                  setParticipantLoginId(e.target.value.toUpperCase());
-                  setParticipantLoginIdError("");
-                }}
-                onKeyPress={(e) => {
-                  if (e.key === "Enter") {
-                    handleParticipantLoginSubmit();
-                  }
-                }}
-                placeholder="APR001"
-                style={{
-                  width: "100%",
-                  padding: 12,
-                  marginTop: 8,
-                  fontSize: 16,
-                  borderRadius: 4,
-                  border: participantLoginIdError ? "2px solid #dc3545" : "1px solid #ccc",
-                  textTransform: "uppercase",
-                }}
-                autoFocus
-              />
-            </label>
-            {participantLoginIdError && (
-              <p style={{ color: "#dc3545", marginTop: 8, fontSize: 14 }}>
-                {participantLoginIdError}
-              </p>
-            )}
-          </div>
-          <button
-            onClick={handleParticipantLoginSubmit}
-            disabled={!participantLoginId.trim()}
-            style={{
-              marginTop: 16,
-              padding: "12px 24px",
-              backgroundColor: participantLoginId.trim() ? "#0070f3" : "#ccc",
-              color: "white",
-              border: "none",
-              borderRadius: 4,
-              cursor: participantLoginId.trim() ? "pointer" : "not-allowed",
-              fontSize: 16,
-            }}
-          >
-            Continue
-          </button>
-          <button
-            onClick={() => {
-              setHasAccess(false);
-              setHasParticipantLoginId(false);
-              setParticipantLoginId("");
-              setParticipantLoginIdError("");
-              setAccessCode("");
-              setAccessCodeError("");
-            }}
-            style={{
-              marginTop: 12,
-              padding: "10px 16px",
-              backgroundColor: "transparent",
-              color: "#0070f3",
-              border: "1px solid #0070f3",
-              borderRadius: 4,
-              cursor: "pointer",
-              fontSize: 14,
-              width: "100%",
-            }}
-          >
-            Back
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return <PromptStudy participantLoginId={participantLoginId.trim().toUpperCase()} />;
+  return (
+    <PromptStudy
+      participantLoginId={participantLoginId}
+      participantEmail={participantEmail || undefined}
+    />
+  );
 }
 
 

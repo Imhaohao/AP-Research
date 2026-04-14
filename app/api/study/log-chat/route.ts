@@ -64,8 +64,13 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = createClient(url, key);
+  const participantLoginId =
+    typeof session_profile.participant_login_id === 'string'
+      ? session_profile.participant_login_id.trim().toUpperCase() || null
+      : null;
   const { error } = await supabase.from('study_chat_turns').insert({
     client_submission_id,
+    participant_login_id: participantLoginId,
     study_group,
     turn_index,
     session_profile,

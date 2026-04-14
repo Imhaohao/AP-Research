@@ -4,6 +4,7 @@
 create table if not exists public.study_chat_turns (
   id uuid primary key default gen_random_uuid(),
   client_submission_id text not null,
+  participant_login_id text,
   study_group text not null check (study_group in ('control', 'treatment')),
   turn_index int not null,
   session_profile jsonb not null,
@@ -16,6 +17,9 @@ create table if not exists public.study_chat_turns (
 
 create index if not exists study_chat_turns_session_idx
   on public.study_chat_turns (client_submission_id, turn_index);
+
+create index if not exists study_chat_turns_participant_login_id_idx
+  on public.study_chat_turns (participant_login_id);
 
 create index if not exists study_chat_turns_created_idx
   on public.study_chat_turns (created_at desc);

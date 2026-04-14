@@ -43,6 +43,7 @@ create policy "study_results_anon_update"
 create table if not exists public.study_chat_turns (
   id uuid primary key default gen_random_uuid(),
   client_submission_id text not null,
+  participant_login_id text,
   study_group text not null check (
     study_group in (
       'control',
@@ -64,6 +65,9 @@ create table if not exists public.study_chat_turns (
 create index if not exists study_chat_turns_session_idx
   on public.study_chat_turns (client_submission_id, turn_index);
 
+create index if not exists study_chat_turns_participant_login_id_idx
+  on public.study_chat_turns (participant_login_id);
+
 create index if not exists study_chat_turns_created_idx
   on public.study_chat_turns (created_at desc);
 
@@ -78,6 +82,7 @@ create policy "study_chat_turns_anon_insert"
 -- ========== participant roster (login IDs + baseline survey) ==========
 create table if not exists public.study_participants (
   login_id text primary key,
+  access_code text unique not null,
   email text unique not null,
   full_name text not null,
   available_prime boolean not null default false,
@@ -95,6 +100,13 @@ alter table public.study_results
 
 alter table public.study_results
   add constraint study_results_participant_login_id_fkey
+  foreign key (participant_login_id) references public.study_participants(login_id);
+
+alter table public.study_chat_turns
+  drop constraint if exists study_chat_turns_participant_login_id_fkey;
+
+alter table public.study_chat_turns
+  add constraint study_chat_turns_participant_login_id_fkey
   foreign key (participant_login_id) references public.study_participants(login_id);
 
 -- ========== systematic 3-arm sequence (atomic with service role + RPC) ==========
