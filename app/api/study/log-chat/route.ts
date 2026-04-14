@@ -27,6 +27,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
+  const ALLOWED = new Set([
+    'control',
+    'treatment',
+    'unrestricted_ai',
+    'guided_ai',
+    'prompt_bank_ai',
+  ]);
+
   const {
     client_submission_id,
     study_group,
@@ -41,7 +49,8 @@ export async function POST(request: NextRequest) {
   if (
     typeof client_submission_id !== 'string' ||
     !client_submission_id ||
-    (study_group !== 'control' && study_group !== 'treatment') ||
+    typeof study_group !== 'string' ||
+    !ALLOWED.has(study_group) ||
     typeof turn_index !== 'number' ||
     !Number.isInteger(turn_index) ||
     turn_index < 1 ||

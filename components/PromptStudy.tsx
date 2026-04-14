@@ -8,6 +8,15 @@ import {
   isCraftCurriculumPath,
   type CraftPromptId,
 } from '@/lib/craftCurriculum';
+import {
+  ARM_LABELS,
+  craftAiNarrativeChatSystemPrompt,
+  craftRevisionCoachPrompt,
+  NARRATIVE_PROMPT_BANK,
+  usesLegacyTwoArmDesign,
+  type StudyGroupSlug,
+  type TreatmentArm,
+} from '@/lib/studyArms';
 
 function formatOpenAiHelperError(message: string): string {
   const m = (message || '').trim();
@@ -21,13 +30,10 @@ function formatOpenAiHelperError(message: string): string {
  * A simple TypeScript React component that guides a student through a
  * quasi‑experimental prompt engineering study. It mirrors the high level
  * structure described in the research proposal: students are randomly
- * assigned to either a control or treatment group, complete a pre‑survey,
- * watch a mini‑module (prompt engineering vs digital literacy), write a
- * short explanation on an unfamiliar topic using AI if they choose, and
- * complete a post‑survey. Results are sent to Supabase when the participant reaches the thank‑you screen.
+ * assigned systematically (3 AI-use arms via Supabase order) or, in legacy mode,
+ * to control vs treatment. Results are sent to Supabase when the participant reaches the thank‑you screen.
  */
-export default function PromptStudy() {
-  type Group = "control" | "treatment";
+export default function PromptStudy({ participantEmail }: { participantEmail?: string }) {
   type Stage =
     | "consent"
     | "preSurvey"
@@ -43,12 +49,68 @@ export default function PromptStudy() {
     | "craftReflect"
     | "craftExit";
 
-  // Randomly assign on first render
-  const [group] = useState<Group>(() => {
-    return Math.random() < 0.5 ? "control" : "treatment";
-  });
+  const legacyTwoArm = usesLegacyTwoArmDesign();
+  const [legacyGroup] = useState<'control' | 'treatment'>(() =>
+    Math.random() < 0.5 ? 'control' : 'treatment'
+  );
 
-  const useCraftPath = isCraftCurriculumPath(group);
+  const useCraftPath = legacyTwoArm ? isCraftCurriculumPath(legacyGroup) : true;
+
+  const [assignStatus, setAssignStatus] = useState<'loading' | 'ready' | 'error'>(() =>
+    legacyTwoArm ? 'ready' : 'loading'
+  );
+  const [assignFetchId, setAssignFetchId] = useState(0);
+  const [assignErrorMsg, setAssignErrorMsg] = useState('');
+  const [assignWarningMsg, setAssignWarningMsg] = useState('');
+  const [treatmentArm, setTreatmentArm] = useState<TreatmentArm | null>(null);
+  const [participantSequence, setParticipantSequence] = useState<number | null>(null);
+  const [modernStudyGroup, setModernStudyGroup] = useState<StudyGroupSlug | null>(null);
+
+  const effectiveStudyGroup: StudyGroupSlug = legacyTwoArm
+    ? legacyGroup
+    : (modernStudyGroup ?? 'guided_ai');
+
+  /** Coaching / generation style: legacy study uses guided-style (arm 1); RCT uses assigned arm */
+  const coachArm: TreatmentArm = legacyTwoArm ? 1 : (treatmentArm ?? 1);
+
+  useEffect(() => {
+    if (legacyTwoArm) return;
+    let cancelled = false;
+    setAssignStatus('loading');
+    setAssignErrorMsg('');
+    void (async () => {
+      try {
+        const r = await fetch('/api/study/assign');
+        const j = (await r.json()) as {
+          error?: string;
+          treatment_arm?: TreatmentArm;
+          study_group?: StudyGroupSlug;
+          participant_sequence?: number | null;
+          warning?: string;
+        };
+        if (!r.ok) throw new Error(j.error || `Assignment failed (${r.status})`);
+        if (cancelled) return;
+        if (j.treatment_arm === undefined || j.treatment_arm === null) {
+          throw new Error('Invalid assignment response');
+        }
+        setTreatmentArm(j.treatment_arm as TreatmentArm);
+        setModernStudyGroup(j.study_group ?? null);
+        setParticipantSequence(
+          j.participant_sequence !== undefined ? j.participant_sequence : null
+        );
+        setAssignWarningMsg(j.warning ?? '');
+        setAssignStatus('ready');
+      } catch (e) {
+        if (!cancelled) {
+          setAssignErrorMsg(e instanceof Error ? e.message : 'Assignment failed');
+          setAssignStatus('error');
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [legacyTwoArm, assignFetchId]);
 
   const [stage, setStage] = useState<Stage>("consent");
   const [preResponses, setPreResponses] = useState({
@@ -116,6 +178,15 @@ export default function PromptStudy() {
   const [openAiLoading, setOpenAiLoading] = useState(false);
   const [openAiError, setOpenAiError] = useState('');
 
+  /** Separate chat transcripts for AI-narrative vs revision (shared `openAiMessages` state). */
+  useEffect(() => {
+    if (stage === 'craftAI' || stage === 'craftRevise') {
+      setOpenAiMessages([]);
+      setOpenAiInput('');
+      setOpenAiError('');
+    }
+  }, [stage]);
+
   const [craftData, setCraftData] = useState({
     icebreakerPriorKnowledge: '',
     selectedPromptId: '' as '' | CraftPromptId,
@@ -137,9 +208,6 @@ export default function PromptStudy() {
     commitmentStatement: '',
     optionalHowToGuide: '',
   });
-  const [craftAiLoading, setCraftAiLoading] = useState(false);
-  const [craftAiError, setCraftAiError] = useState('');
-
   const [sessionStartedAt] = useState(() => new Date().toISOString());
   const chatTurnIndexRef = useRef(0);
 
@@ -153,7 +221,10 @@ export default function PromptStudy() {
   const buildSessionProfile = useCallback((): Record<string, unknown> => {
     return {
       client_submission_id: clientSubmissionId,
-      study_group: group,
+      participant_email: participantEmail ?? null,
+      study_group: effectiveStudyGroup,
+      treatment_arm: legacyTwoArm ? null : treatmentArm,
+      participant_sequence: legacyTwoArm ? null : participantSequence,
       curriculum: useCraftPath ? 'stanford_craft_narrative_async' : 'default_prompt_study',
       session_started_at: sessionStartedAt,
       profile_captured_at: new Date().toISOString(),
@@ -177,7 +248,10 @@ export default function PromptStudy() {
     };
   }, [
     clientSubmissionId,
-    group,
+    effectiveStudyGroup,
+    legacyTwoArm,
+    treatmentArm,
+    participantSequence,
     sessionStartedAt,
     stage,
     taskData.topic,
@@ -192,6 +266,7 @@ export default function PromptStudy() {
     setSaveStatus('saving');
     setSaveMessage('');
     const data: Record<string, unknown> = {
+      participant_email: participantEmail ?? null,
       consent,
       pre_responses: preResponses,
       post_responses: postResponses,
@@ -215,7 +290,9 @@ export default function PromptStudy() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           client_submission_id: clientSubmissionId,
-          study_group: group,
+          study_group: effectiveStudyGroup,
+          treatment_arm: legacyTwoArm ? null : treatmentArm,
+          participant_sequence: legacyTwoArm ? null : participantSequence,
           data,
         }),
       });
@@ -231,7 +308,10 @@ export default function PromptStudy() {
     }
   }, [
     clientSubmissionId,
-    group,
+    effectiveStudyGroup,
+    legacyTwoArm,
+    treatmentArm,
+    participantSequence,
     consent,
     preResponses,
     postResponses,
@@ -247,6 +327,7 @@ export default function PromptStudy() {
     buildSessionProfile,
     useCraftPath,
     craftData,
+    participantEmail,
   ]);
 
   useEffect(() => {
@@ -268,7 +349,6 @@ export default function PromptStudy() {
         'craftRevise',
         'craftReflect',
         'craftExit',
-        'postSurvey',
         'complete',
       ]
     : ['consent', 'preSurvey', 'module', 'task', 'postSurvey', 'complete'];
@@ -297,7 +377,7 @@ export default function PromptStudy() {
       <div className="lms-progress">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
           <span style={{ fontSize: '0.875rem', color: '#666' }}>Progress</span>
-          <span style={{ fontSize: '0.875rem', color: '#1a5490', fontWeight: '600' }}>
+          <span style={{ fontSize: '0.875rem', color: '#006B3F', fontWeight: '600' }}>
             Step {currentStep < 0 ? 0 : currentStep + 1} of {steps.length}
           </span>
         </div>
@@ -350,7 +430,42 @@ export default function PromptStudy() {
           <h3>Your Privacy</h3>
           <p>Your responses are completely anonymous. You may exit the study at any time by closing this window.</p>
 
-          <div className="form-group" style={{ background: '#fff3cd', borderLeftColor: '#ffc107' }}>
+          {!legacyTwoArm ? (
+            <div className="form-group" style={{ background: '#FDF6E3', borderLeftColor: '#D4A843' }}>
+              <h4 style={{ marginTop: 0 }}>Your study condition</h4>
+              {assignStatus === 'loading' && <p style={{ marginBottom: 0 }}>Assigning your condition…</p>}
+              {assignStatus === 'error' && (
+                <div>
+                  <p style={{ color: '#c62828', marginBottom: '0.5rem' }}>{assignErrorMsg}</p>
+                  <button type="button" onClick={() => setAssignFetchId((n) => n + 1)}>
+                    Try again
+                  </button>
+                </div>
+              )}
+              {assignStatus === 'ready' && treatmentArm !== null && (
+                <>
+                  <p style={{ marginBottom: '0.35rem' }}>
+                    <strong>{ARM_LABELS[treatmentArm].title}</strong>
+                  </p>
+                  <p style={{ marginBottom: '0.35rem', fontSize: '0.95rem' }}>
+                    {ARM_LABELS[treatmentArm].description}
+                  </p>
+                  {participantSequence !== null ? (
+                    <p style={{ marginBottom: 0, fontSize: '0.85rem', color: '#555' }}>
+                      Enrollment order: {participantSequence}
+                    </p>
+                  ) : null}
+                  {assignWarningMsg ? (
+                    <p style={{ marginBottom: 0, marginTop: '0.75rem', fontSize: '0.85rem', color: '#8B7230' }}>
+                      {assignWarningMsg}
+                    </p>
+                  ) : null}
+                </>
+              )}
+            </div>
+          ) : null}
+
+          <div className="form-group" style={{ background: '#FDF6E3', borderLeftColor: '#D4A843' }}>
             <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
               <input
                 type="checkbox"
@@ -363,7 +478,7 @@ export default function PromptStudy() {
           </div>
 
           <button
-            disabled={!consent}
+            disabled={!consent || (!legacyTwoArm && assignStatus !== 'ready')}
             onClick={() => setStage("preSurvey")}
             style={{ marginTop: '1rem' }}
           >
@@ -488,8 +603,8 @@ export default function PromptStudy() {
       <div className="lms-container">
         {renderProgressBar()}
         <div className="lms-card">
-          <h2>{group === "treatment" ? "Prompt Engineering Mini‑Course" : "Digital Literacy Module"}</h2>
-          {group === "treatment" ? (
+          <h2>{legacyGroup === "treatment" ? "Prompt Engineering Mini‑Course" : "Digital Literacy Module"}</h2>
+          {legacyGroup === "treatment" ? (
             <>
               <p style={{ fontSize: '1.1rem', fontWeight: '500', marginBottom: '1.5rem' }}>
                 Welcome! This module introduces prompt engineering: the art and science of crafting effective prompts to get better results from AI tools.
@@ -499,24 +614,24 @@ export default function PromptStudy() {
               <p>Effective prompts are structured using three key components:</p>
               
               <div style={{ display: 'grid', gap: '1rem', marginTop: '1rem', marginBottom: '2rem' }}>
-                <div style={{ padding: '1.25rem', background: '#e3f2fd', borderRadius: '8px', borderLeft: '4px solid #1a5490' }}>
+                <div style={{ padding: '1.25rem', background: '#E6F2EC', borderRadius: '8px', borderLeft: '4px solid #006B3F' }}>
                   <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
-                    <strong style={{ color: '#1a5490', fontSize: '1.1rem' }}>Role</strong>
+                    <strong style={{ color: '#006B3F', fontSize: '1.1rem' }}>Role</strong>
                     <span className="info-badge">Who is the AI?</span>
                   </div>
                   <p style={{ margin: '0.5rem 0 0.75rem 0' }}>Define the persona or expertise the AI should adopt.</p>
-                  <div style={{ background: '#ffffff', padding: '0.75rem', borderRadius: '6px', border: '2px solid #1a5490' }}>
+                  <div style={{ background: '#ffffff', padding: '0.75rem', borderRadius: '6px', border: '2px solid #006B3F' }}>
                     <code>You are a journalist.</code>
                   </div>
                 </div>
 
-                <div style={{ padding: '1.25rem', background: '#f3e5f5', borderRadius: '8px', borderLeft: '4px solid #7b1fa2' }}>
+                <div style={{ padding: '1.25rem', background: '#FDF6E3', borderRadius: '8px', borderLeft: '4px solid #D4A843' }}>
                   <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
-                    <strong style={{ color: '#7b1fa2', fontSize: '1.1rem' }}>Context</strong>
-                    <span className="info-badge" style={{ background: '#f0e8f5', color: '#7b1fa2' }}>What's the situation?</span>
+                    <strong style={{ color: '#006B3F', fontSize: '1.1rem' }}>Context</strong>
+                    <span className="info-badge" style={{ background: '#E6F2EC', color: '#006B3F' }}>What's the situation?</span>
                   </div>
                   <p style={{ margin: '0.5rem 0 0.75rem 0' }}>Provide background information or the setting.</p>
-                  <div style={{ background: '#ffffff', padding: '0.75rem', borderRadius: '6px', border: '2px solid #7b1fa2' }}>
+                  <div style={{ background: '#ffffff', padding: '0.75rem', borderRadius: '6px', border: '2px solid #D4A843' }}>
                     <code>There is a mental health crisis in the country.</code>
                   </div>
                 </div>
@@ -536,8 +651,8 @@ export default function PromptStudy() {
               <h3>🔄 Contrasting Cases: Learning by Comparison</h3>
               <p>When you use AI, it can generate multiple different responses. Each version may emphasize different aspects, use different vocabulary, or approach the topic from a different angle.</p>
               
-              <div style={{ marginTop: '1.5rem', padding: '1.5rem', background: '#fff9e6', borderRadius: '8px', border: '2px solid #ffc107' }}>
-                <strong style={{ color: '#f57c00' }}>💡 Why This Matters:</strong>
+              <div style={{ marginTop: '1.5rem', padding: '1.5rem', background: '#FDF6E3', borderRadius: '10px', border: '2px solid #D4A843' }}>
+                <strong style={{ color: '#006B3F' }}>💡 Why This Matters:</strong>
                 <p style={{ marginTop: '0.5rem', marginBottom: 0 }}>
                   Comparing multiple responses helps you understand what makes a response effective. 
                   You'll learn to evaluate tone, clarity, completeness, and appropriateness—skills that transfer to your own writing!
@@ -545,7 +660,7 @@ export default function PromptStudy() {
               </div>
 
               <h3 style={{ marginTop: '2rem' }}>⚡ Mindful AI Usage: Environmental Impact</h3>
-              <div style={{ marginTop: '1rem', padding: '1.5rem', background: '#fff3e0', borderRadius: '8px', borderLeft: '4px solid #f57c00' }}>
+              <div style={{ marginTop: '1rem', padding: '1.5rem', background: '#FDF6E3', borderRadius: '10px', borderLeft: '4px solid #D4A843' }}>
                 <p style={{ fontWeight: '500', marginBottom: '1rem' }}>
                   <strong>Did you know?</strong> AI technologies require significant energy and computational resources.
                 </p>
@@ -584,7 +699,7 @@ export default function PromptStudy() {
               </p>
 
               {!showPractice ? (
-                <div style={{ marginTop: '2rem', padding: '1.5rem', background: '#e3f2fd', borderRadius: '8px', border: '2px solid #1a5490', textAlign: 'center' }}>
+                <div style={{ marginTop: '2rem', padding: '1.5rem', background: '#E6F2EC', borderRadius: '8px', border: '2px solid #006B3F', textAlign: 'center' }}>
                   <p style={{ margin: '0 0 1rem 0', fontWeight: '500' }}>
                     💡 Want to try it out?
                   </p>
@@ -597,12 +712,12 @@ export default function PromptStudy() {
                 </div>
               ) : (
                 <div style={{ marginTop: '2rem' }}>
-                  <div style={{ padding: '1rem', background: '#e3f2fd', borderRadius: '8px', borderLeft: '4px solid #1a5490', marginBottom: '1rem' }}>
+                  <div style={{ padding: '1rem', background: '#E6F2EC', borderRadius: '8px', borderLeft: '4px solid #006B3F', marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <strong>Tries Available: </strong>
                         {[...Array(practiceTries)].map((_, i) => (
-                          <span key={i} style={{ fontSize: '1.2rem', color: '#1a5490' }}>🅱</span>
+                          <span key={i} style={{ fontSize: '1.2rem', color: '#006B3F' }}>🅱</span>
                         ))}
                       </div>
                       <button onClick={() => setShowPractice(false)} style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}>
@@ -615,9 +730,9 @@ export default function PromptStudy() {
                   </div>
 
                   <div style={{ display: 'grid', gap: '1rem', marginBottom: '1.5rem' }}>
-                    <div style={{ padding: '1.25rem', background: '#e3f2fd', borderRadius: '8px' }}>
+                    <div style={{ padding: '1.25rem', background: '#E6F2EC', borderRadius: '8px' }}>
                       <label>
-                        <strong style={{ color: '#1a5490' }}>Role:</strong>
+                        <strong style={{ color: '#006B3F' }}>Role:</strong>
                         <input
                           type="text"
                           value={practicePrompt.role}
@@ -628,9 +743,9 @@ export default function PromptStudy() {
                       </label>
                     </div>
 
-                    <div style={{ padding: '1.25rem', background: '#f3e5f5', borderRadius: '8px' }}>
+                    <div style={{ padding: '1.25rem', background: '#FDF6E3', borderRadius: '8px' }}>
                       <label>
-                        <strong style={{ color: '#7b1fa2' }}>Context:</strong>
+                        <strong style={{ color: '#006B3F' }}>Context:</strong>
                         <textarea
                           value={practicePrompt.context}
                           onChange={(e) => setPracticePrompt({ ...practicePrompt, context: e.target.value })}
@@ -713,94 +828,30 @@ export default function PromptStudy() {
     );
   }
 
-  async function generateCraftAINarrative() {
-    const def = CRAFT_NARRATIVE_PROMPTS.find((p) => p.id === craftData.selectedPromptId);
-    if (!def) return;
-    setCraftAiLoading(true);
-    setCraftAiError('');
-    const genPrompt = `You are a creative writing assistant. Write a short story of 1-2 paragraphs (about 150–280 words) responding to this prompt. Use vivid narrative voice and concrete details. Write only the story — no title line, no preamble.\n\nPrompt:\n${def.text}`;
-    try {
-      const response = await fetch('/api/llm/openai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: genPrompt,
-          apiKey: openAiApiKey.trim() || undefined,
-        }),
-      });
-      const data = (await response.json()) as {
-        response?: string;
-        model?: string;
-        error?: string;
-      };
-      if (!response.ok) {
-        throw new Error(
-          formatOpenAiHelperError(String(data.error || 'Failed to generate AI narrative'))
-        );
-      }
-      const assistantText = data.response ?? '';
-      setCraftData((d) => ({ ...d, aiNarrative: assistantText }));
-      setTaskData((t) => ({ ...t, usedAi: true }));
-
-      chatTurnIndexRef.current += 1;
-      void fetch('/api/study/log-chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_submission_id: clientSubmissionId,
-          study_group: group,
-          turn_index: chatTurnIndexRef.current,
-          session_profile: buildSessionProfile(),
-          user_message: `[generate_ai_narrative] ${def.id}`,
-          full_prompt: genPrompt,
-          assistant_response: assistantText,
-          model: data.model ?? null,
-        }),
-      }).catch(() => {});
-    } catch (e) {
-      setCraftAiError(
-        e instanceof Error ? e.message : 'Could not generate. Check API billing or try again.'
-      );
-    } finally {
-      setCraftAiLoading(false);
-    }
-  }
-
   async function handleOpenAiMessage() {
     if (!openAiInput.trim()) {
       return;
     }
 
     const userMessage = openAiInput.trim();
-    setOpenAiInput('');
-    setOpenAiLoading(true);
-    setOpenAiError('');
 
-    const newMessages = [...openAiMessages, { role: 'user' as const, content: userMessage }];
-    setOpenAiMessages(newMessages);
-
-    try {
-      const systemPrompt =
-        stage === 'craftRevise'
-          ? `You help students revise narrative fiction for a high school English class.
-
-The student's own draft (human-written) is:
----
-${craftData.humanNarrative || '(not provided)'}
----
-
-An AI-generated comparison draft from the same story prompt was:
----
-${craftData.aiNarrative || '(not generated yet)'}
----
-
-Their current working revision (they may paste updates here in chat or keep in the revision box) is:
----
-${craftData.revisedNarrative || '(see notes in chat)'}
----
-
-Respond to their requests: clarify vague details, grammar and sentences, expand sensory detail, strengthen voice, or tighten plot — while preserving their main ideas unless they ask to change them. Do not replace their voice with generic prose; prefer targeted edits and questions.`
-          : `You are a helpful writing assistant helping a student write a 200-250 word explanation for a 9th-grade student about: "${taskData.topic}".
+    let systemPrompt: string;
+    if (stage === 'craftAI') {
+      const def = CRAFT_NARRATIVE_PROMPTS.find((p) => p.id === craftData.selectedPromptId);
+      if (!def) {
+        setOpenAiError('Missing prompt selection. Go back one step and confirm your prompt.');
+        return;
+      }
+      systemPrompt = craftAiNarrativeChatSystemPrompt(coachArm, def.text);
+    } else if (stage === 'craftRevise') {
+      systemPrompt = craftRevisionCoachPrompt(
+        coachArm,
+        craftData.humanNarrative,
+        craftData.aiNarrative,
+        craftData.revisedNarrative
+      );
+    } else {
+      systemPrompt = `You are a helpful writing assistant helping a student write a 200-250 word explanation for a 9th-grade student about: "${taskData.topic}".
 
 Your role is to:
 - Help them brainstorm ideas and structure their explanation
@@ -809,6 +860,16 @@ Your role is to:
 - Encourage critical thinking and learning
 
 Do NOT write the explanation for them. Instead, guide them with questions, suggestions, and feedback.`;
+    }
+
+    setOpenAiInput('');
+    setOpenAiLoading(true);
+    setOpenAiError('');
+
+    const newMessages = [...openAiMessages, { role: 'user' as const, content: userMessage }];
+    setOpenAiMessages(newMessages);
+
+    try {
 
       const transcript = newMessages
         .map((m) => `${m.role === 'user' ? 'Student' : 'Assistant'}: ${m.content}`)
@@ -845,7 +906,7 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           client_submission_id: clientSubmissionId,
-          study_group: group,
+          study_group: effectiveStudyGroup,
           turn_index: chatTurnIndexRef.current,
           session_profile: buildSessionProfile(),
           user_message: userMessage,
@@ -903,7 +964,7 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
         <p>
           <strong>Narrative writing</strong> · <strong>Generative AI</strong>
         </p>
-        <div className="form-group" style={{ background: '#fff9e6', borderLeftColor: '#ffc107' }}>
+        <div className="form-group" style={{ background: '#FDF6E3', borderLeftColor: '#D4A843' }}>
           <label>
             <strong>Icebreaker (replacing sticky notes):</strong> What do you already know about using ChatGPT-style tools for writing?
             <textarea
@@ -945,10 +1006,10 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
                 alignItems: 'flex-start',
                 padding: '0.75rem',
                 border:
-                  craftData.selectedPromptId === p.id ? '2px solid #1a5490' : '1px solid #ddd',
+                  craftData.selectedPromptId === p.id ? '2px solid #006B3F' : '1px solid #ddd',
                 borderRadius: '8px',
                 cursor: 'pointer',
-                background: craftData.selectedPromptId === p.id ? '#f0f7ff' : '#fff',
+                background: craftData.selectedPromptId === p.id ? '#E6F2EC' : '#fff',
               }}
             >
               <input
@@ -995,8 +1056,8 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
     return craftNavCard(
       <>
         <p>
-          Now use <strong>the same prompt</strong> with generative AI. Here you can run the built-in ChatGPT API (or your
-          teacher&apos;s tool). Paste or edit the AI output below if you generated it elsewhere.
+          Now use <strong>the same prompt</strong> with generative AI. Use the same <strong>ChatGPT panel</strong> as in other
+          activities: have a short conversation, then copy the model&apos;s story into the box below (or edit it) before you continue.
         </p>
         {sel && (
           <div style={{ padding: '1rem', background: '#f5f5f5', borderRadius: '8px', marginTop: '0.75rem' }}>
@@ -1004,31 +1065,109 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
           </div>
         )}
         {!schoolGeminiOnly ? (
-          <div className="form-group" style={{ marginTop: '1rem' }}>
-            <label>
-              <strong>OpenAI API key (optional)</strong> if your teacher didn&apos;t set a server key:
-              <input
-                type="password"
-                value={openAiApiKey}
-                onChange={(e) => setOpenAiApiKey(e.target.value)}
-                style={{ marginTop: '0.5rem' }}
-              />
-            </label>
-            {craftAiError && (
-              <p style={{ color: '#c62828', fontSize: '0.9rem', marginTop: '0.5rem' }}>{craftAiError}</p>
-            )}
-            <button
-              type="button"
-              onClick={() => void generateCraftAINarrative()}
-              disabled={craftAiLoading || !craftData.selectedPromptId}
-              style={{ marginTop: '0.75rem' }}
+          <div
+            style={{
+              padding: '1.5rem',
+              background: '#F7F8F5',
+              borderRadius: '10px',
+              border: '2px solid #006B3F',
+              marginTop: '1rem',
+            }}
+          >
+            <h3 style={{ marginTop: 0, color: '#004F2D' }}>ChatGPT · AI sample narrative</h3>
+            <p style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>
+              The assistant is given your assignment prompt and your study condition. Ask for feedback or for the sample story; when
+              you&apos;re satisfied, use the button below to paste the last reply into the AI story field.
+            </p>
+            <div className="form-group" style={{ background: '#fff' }}>
+              <label>
+                API key (optional)
+                <input
+                  type="password"
+                  value={openAiApiKey}
+                  onChange={(e) => setOpenAiApiKey(e.target.value)}
+                  placeholder="Leave blank if your teacher set a server key"
+                  style={{ marginTop: '0.25rem' }}
+                />
+              </label>
+            </div>
+            <div
+              style={{
+                background: '#fff',
+                borderRadius: '6px',
+                border: '1px solid #e0e0e0',
+                maxHeight: '320px',
+                display: 'flex',
+                flexDirection: 'column',
+                marginTop: '0.5rem',
+              }}
             >
-              {craftAiLoading ? 'Generating…' : 'Generate AI story with same prompt'}
-            </button>
+              <div style={{ padding: '0.75rem', overflowY: 'auto', flex: 1, maxHeight: '220px' }}>
+                {openAiMessages.length === 0 ? (
+                  <p style={{ color: '#666', fontStyle: 'italic', fontSize: '0.9rem', margin: 0 }}>
+                    {coachArm === 0
+                      ? 'Example: “Please write the full short story for this prompt.”'
+                      : 'Example: “I’m ready — please write the AI sample story (1–2 paragraphs) for this prompt.”'}
+                  </p>
+                ) : (
+                  openAiMessages.map((msg, idx) => (
+                    <div key={idx} style={{ marginBottom: '0.75rem' }}>
+                      <strong style={{ fontSize: '0.8rem', color: '#666' }}>
+                        {msg.role === 'user' ? 'You' : 'ChatGPT'}
+                      </strong>
+                      <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.9rem' }}>{msg.content}</div>
+                    </div>
+                  ))
+                )}
+                {openAiLoading && <em>Thinking…</em>}
+              </div>
+              {openAiError && (
+                <div style={{ padding: '0.5rem', background: '#ffebee', color: '#c62828', fontSize: '0.85rem' }}>
+                  {openAiError}
+                </div>
+              )}
+              <div style={{ padding: '0.5rem', display: 'flex', gap: '0.5rem', borderTop: '1px solid #eee' }}>
+                <textarea
+                  value={openAiInput}
+                  onChange={(e) => setOpenAiInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      void handleOpenAiMessage();
+                    }
+                  }}
+                  rows={2}
+                  style={{ flex: 1, resize: 'none' }}
+                  disabled={openAiLoading}
+                  placeholder="Message ChatGPT…"
+                />
+                <button type="button" disabled={openAiLoading || !openAiInput.trim()} onClick={() => void handleOpenAiMessage()}>
+                  Send
+                </button>
+              </div>
+            </div>
+            {(() => {
+              const lastAssistant = [...openAiMessages].reverse().find((m) => m.role === 'assistant');
+              return (
+                <button
+                  type="button"
+                  style={{ marginTop: '0.75rem' }}
+                  disabled={!lastAssistant}
+                  onClick={() => {
+                    if (lastAssistant) {
+                      setCraftData((d) => ({ ...d, aiNarrative: lastAssistant.content.trim() }));
+                      setTaskData((t) => ({ ...t, usedAi: true }));
+                    }
+                  }}
+                >
+                  Use last ChatGPT reply as AI story
+                </button>
+              );
+            })()}
           </div>
         ) : (
           <p style={{ marginTop: '1rem', color: '#666' }}>
-            Built-in generation is off (<code>GEMINI_SCHOOL_ONLY</code>). Use your school tool, then paste the AI story below.
+            Built-in ChatGPT is off (<code>GEMINI_SCHOOL_ONLY</code>). Use your school tool, then paste the AI story below.
           </p>
         )}
         {schoolGeminiUrl ? (
@@ -1170,6 +1309,34 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
           <strong>Activity 3 · Revise with AI.</strong> Edit your <em>own</em> narrative below. Use the chat to ask for help
           (clarify details, grammar, richer scenes, length) — try several prompts like the lesson suggests.
         </p>
+        {coachArm === 2 ? (
+          <div
+            className="form-group"
+            style={{
+              background: '#FDF6E3',
+              borderLeft: '4px solid #D4A843',
+              padding: '0.75rem 1rem',
+              marginBottom: '1rem',
+            }}
+          >
+            <h4 style={{ marginTop: 0, marginBottom: '0.5rem' }}>Narrative prompt bank</h4>
+            <p style={{ fontSize: '0.9rem', marginBottom: '0.75rem' }}>
+              Tap a starter to paste it into the chat below; edit it so it fits your story.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {NARRATIVE_PROMPT_BANK.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  className="button-secondary"
+                  onClick={() => setOpenAiInput(item.template)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div className="form-group">
           <label>
             <strong>Your revised narrative</strong>
@@ -1194,13 +1361,13 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
           <div
             style={{
               padding: '1.5rem',
-              background: '#f6faf8',
-              borderRadius: '8px',
-              border: '2px solid #10a37f',
+              background: '#F7F8F5',
+              borderRadius: '10px',
+              border: '2px solid #006B3F',
               marginTop: '1rem',
             }}
           >
-            <h3 style={{ marginTop: 0, color: '#0d8f6e' }}>ChatGPT · revision chat</h3>
+            <h3 style={{ marginTop: 0, color: '#004F2D' }}>ChatGPT · revision chat</h3>
             <p style={{ fontSize: '0.9rem' }}>
               The assistant sees your human draft, the AI comparison draft, and your revision box. Ask step by step.
             </p>
@@ -1383,12 +1550,60 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
             />
           </label>
         </div>
-        <button type="button" onClick={() => setStage('postSurvey')}>
-          Continue to post-survey →
+
+        <div
+          style={{
+            marginTop: '1.5rem',
+            padding: '1.25rem',
+            background: '#FDF6E3',
+            borderRadius: '10px',
+            border: '2px solid #D4A843',
+          }}
+        >
+          <h3 style={{ color: '#006B3F', marginTop: 0, marginBottom: '0.75rem' }}>
+            Optional: GPT-5 Lottery
+          </h3>
+          <p style={{ marginBottom: '0.75rem' }}>
+            You can choose to enter the lottery before submitting your responses.
+          </p>
+          <div className="form-group" style={{ background: '#ffffff', borderLeftColor: '#D4A843', marginBottom: '0.75rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={lotteryOptIn}
+                onChange={(e) => setLotteryOptIn(e.target.checked)}
+                style={{ marginRight: '0.75rem', cursor: 'pointer' }}
+              />
+              <span>Yes, enter me in the GPT-5 lottery</span>
+            </label>
+          </div>
+          {lotteryOptIn ? (
+            <div className="form-group" style={{ background: '#ffffff', borderLeftColor: '#D4A843', marginBottom: 0 }}>
+              <label>
+                <strong>Participant Number (from your 950 ID):</strong>
+                <input
+                  type="text"
+                  value={participantNumber}
+                  onChange={(e) => setParticipantNumber(e.target.value)}
+                  placeholder="e.g., 95053492"
+                  style={{ marginTop: '0.5rem' }}
+                />
+              </label>
+            </div>
+          ) : null}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setStage('complete')}
+          disabled={lotteryOptIn && !participantNumber.trim()}
+          style={{ marginTop: '1rem' }}
+        >
+          Submit study →
         </button>
       </>,
       'Exit ticket & commitment',
-      'Almost done — research post-survey next'
+      'Final step — submit your responses'
     );
   }
 
@@ -1406,12 +1621,12 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
                 marginTop: '1.5rem',
                 marginBottom: '1.5rem',
                 padding: '1.25rem',
-                background: '#f0f7ff',
-                borderRadius: '8px',
-                border: '2px solid #1a5490',
+                background: '#FDF6E3',
+                borderRadius: '10px',
+                border: '2px solid #D4A843',
               }}
             >
-              <h3 style={{ margin: '0 0 0.5rem', color: '#1a5490', fontSize: '1.05rem' }}>School Gemini (optional)</h3>
+              <h3 style={{ margin: '0 0 0.5rem', color: '#006B3F', fontSize: '1.05rem' }}>School Gemini (optional)</h3>
               <p style={{ margin: '0 0 0.75rem', fontSize: '0.9rem', color: '#333' }}>
                 If your class uses Google&apos;s Gemini in the browser, open it in a new tab with your school account.
               </p>
@@ -1422,7 +1637,7 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
                 style={{
                   display: 'inline-block',
                   padding: '0.5rem 1rem',
-                  background: '#1a5490',
+                  background: '#006B3F',
                   color: '#fff',
                   borderRadius: '6px',
                   textDecoration: 'none',
@@ -1441,8 +1656,8 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
               style={{
                 marginTop: '1rem',
                 padding: '1rem',
-                background: '#fff3cd',
-                border: '1px solid #ffc107',
+                background: '#FDF6E3',
+                border: '1px solid #D4A843',
                 borderRadius: '8px',
                 marginBottom: '1rem',
                 fontSize: '0.9rem',
@@ -1460,21 +1675,21 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
                 marginTop: '1.5rem',
                 marginBottom: '1.5rem',
                 padding: '1.5rem',
-                background: '#f6faf8',
-                borderRadius: '8px',
-                border: '2px solid #10a37f',
+                background: '#F7F8F5',
+                borderRadius: '10px',
+                border: '2px solid #006B3F',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
                 <span style={{ fontSize: '1.5rem', marginRight: '0.5rem' }}>🤖</span>
-                <h3 style={{ margin: 0, color: '#0d8f6e' }}>ChatGPT writing assistant</h3>
+                <h3 style={{ margin: 0, color: '#004F2D' }}>ChatGPT writing assistant</h3>
               </div>
               <p style={{ marginBottom: '1rem', fontSize: '0.95rem' }}>
                 Ask for brainstorming, structure, and feedback. The model is instructed not to write your explanation for you — only to
                 guide you. Think critically about any suggestions.
               </p>
 
-              <div className="form-group" style={{ background: '#ffffff', borderLeftColor: '#10a37f', marginBottom: '1rem' }}>
+              <div className="form-group" style={{ background: '#ffffff', borderLeftColor: '#006B3F', marginBottom: '1rem' }}>
                 <label>
                   <strong>OpenAI API key (optional):</strong>
                   <input
@@ -1520,9 +1735,9 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
                         style={{
                           marginBottom: '1rem',
                           padding: '0.75rem',
-                          background: msg.role === 'user' ? '#e8f7f2' : '#f5f5f5',
+                          background: msg.role === 'user' ? '#E6F2EC' : '#f5f5f5',
                           borderRadius: '6px',
-                          borderLeft: `3px solid ${msg.role === 'user' ? '#10a37f' : '#666'}`,
+                          borderLeft: `3px solid ${msg.role === 'user' ? '#006B3F' : '#888'}`,
                         }}
                       >
                         <strong style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem', color: '#666' }}>
@@ -1805,49 +2020,11 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
             {saveStatus === 'idle' && <span>Preparing save…</span>}
           </div>
           
-          <div style={{ marginTop: '2rem', padding: '1.5rem', background: '#fff9e6', borderRadius: '8px', border: '2px solid #ffc107' }}>
-            <h3 style={{ color: '#f57c00', marginTop: 0, marginBottom: '1rem' }}>🎉 Optional: Enter our GPT-5 Lottery</h3>
-            <p style={{ marginBottom: '1rem' }}>
-              As a thank you for participating, we're offering a chance to win early access to GPT-5!
-              This is completely optional, and your study participation is valid regardless of your choice.
-            </p>
-            
-            <div className="form-group" style={{ background: '#ffffff', borderLeftColor: '#ffc107', marginBottom: '1rem' }}>
-              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={lotteryOptIn}
-                  onChange={(e) => setLotteryOptIn(e.target.checked)}
-                  style={{ marginRight: '0.75rem', cursor: 'pointer' }}
-                />
-                <span>Yes, I would like to be entered into the GPT-5 lottery</span>
-              </label>
-            </div>
-
-            {lotteryOptIn && (
-              <div className="form-group" style={{ background: '#ffffff', borderLeftColor: '#ffc107' }}>
-                <label>
-                  <strong>Participant Number (from your 950 ID):</strong>
-                  <input
-                    type="text"
-                    value={participantNumber}
-                    onChange={(e) => setParticipantNumber(e.target.value)}
-                    placeholder="e.g., 950-12345"
-                    style={{ marginTop: '0.5rem' }}
-                  />
-                  <small style={{ display: 'block', marginTop: '0.25rem', color: '#666', fontSize: '0.875rem' }}>
-                    This allows us to contact you if you win. This number will be kept separately from your study responses.
-                  </small>
-                </label>
-              </div>
-            )}
-          </div>
-
           <p style={{ marginTop: '2rem', color: '#666', fontSize: '0.9rem' }}>
             If you'd like a copy of your data for personal reference, open your browser's developer console and inspect the state variables.
           </p>
           
-          <div style={{ marginTop: '2rem', padding: '1.5rem', background: '#f0f7ff', borderRadius: '8px', borderLeft: '4px solid #1a5490', textAlign: 'center' }}>
+          <div style={{ marginTop: '2rem', padding: '1.5rem', background: '#E6F2EC', borderRadius: '10px', borderLeft: '4px solid #006B3F', textAlign: 'center' }}>
             <p style={{ margin: 0, fontWeight: '500' }}>Your participation helps advance educational research on AI literacy. Thank you!</p>
           </div>
         </div>

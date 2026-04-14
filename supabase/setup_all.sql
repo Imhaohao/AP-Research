@@ -4,7 +4,18 @@
 -- ========== study_results (final submission upsert) ==========
 create table if not exists public.study_results (
   client_submission_id text primary key,
-  study_group text not null check (study_group in ('control', 'treatment')),
+  study_group text not null check (
+    study_group in (
+      'control',
+      'treatment',
+      'unrestricted_ai',
+      'guided_ai',
+      'prompt_bank_ai'
+    )
+  ),
+  treatment_arm smallint,
+  participant_sequence bigint,
+  participant_email text,
   data jsonb not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -31,7 +42,15 @@ create policy "study_results_anon_update"
 create table if not exists public.study_chat_turns (
   id uuid primary key default gen_random_uuid(),
   client_submission_id text not null,
-  study_group text not null check (study_group in ('control', 'treatment')),
+  study_group text not null check (
+    study_group in (
+      'control',
+      'treatment',
+      'unrestricted_ai',
+      'guided_ai',
+      'prompt_bank_ai'
+    )
+  ),
   turn_index int not null,
   session_profile jsonb not null,
   user_message text not null,
@@ -54,3 +73,33 @@ create policy "study_chat_turns_anon_insert"
   on public.study_chat_turns for insert
   to anon
   with check (true);
+
+-- ========== systematic 3-arm sequence (atomic with service role + RPC) ==========
+create table if not exists public.study_participant_sequence (
+  singleton boolean primary key default true,
+  seq bigint not null default 0
+);
+
+insert into public.study_participant_sequence (singleton, seq)
+values (true, 0)
+on conflict (singleton) do nothing;
+
+create or replace function public.claim_next_participant_sequence()
+returns bigint
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v bigint;
+begin
+  update public.study_participant_sequence
+  set seq = seq + 1
+  where singleton = true
+  returning seq into v;
+  return v;
+end;
+$$;
+
+revoke all on function public.claim_next_participant_sequence() from public;
+grant execute on function public.claim_next_participant_sequence() to service_role;
