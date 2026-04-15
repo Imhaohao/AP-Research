@@ -142,8 +142,15 @@ export async function POST(request: NextRequest) {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !serviceRoleKey) {
+    const missingEnv: string[] = [];
+    if (!url) missingEnv.push('NEXT_PUBLIC_SUPABASE_URL');
+    if (!serviceRoleKey) missingEnv.push('SUPABASE_SERVICE_ROLE_KEY');
     return NextResponse.json(
-      { error: 'Supabase is not configured (NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY).' },
+      {
+        error: 'Supabase is not configured.',
+        missing_env: missingEnv,
+        runtime_env: process.env.VERCEL_ENV ?? 'local',
+      },
       { status: 503 }
     );
   }

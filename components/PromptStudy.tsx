@@ -276,7 +276,6 @@ export default function PromptStudy({
       participant_email: participantEmail ?? null,
       participant_login_id: participantLoginId ?? null,
       consent,
-      pre_responses: preResponses,
       post_responses: postResponses,
       craft_curriculum: useCraftPath ? craftData : null,
       task_data: taskData,
@@ -350,7 +349,6 @@ export default function PromptStudy({
   const flowStages: Stage[] = useCraftPath
     ? [
         'consent',
-        'preSurvey',
         'craftIntro',
         'craftHuman',
         'craftAI',
@@ -360,7 +358,7 @@ export default function PromptStudy({
         'craftExit',
         'complete',
       ]
-    : ['consent', 'preSurvey', 'module', 'task', 'postSurvey', 'complete'];
+    : ['consent', 'module', 'task', 'postSurvey', 'complete'];
 
   const stageShortLabel: Record<Stage, string> = {
     consent: 'Consent',
@@ -497,7 +495,7 @@ export default function PromptStudy({
 
           <button
             disabled={!consent || (!legacyTwoArm && assignStatus !== 'ready')}
-            onClick={() => setStage("preSurvey")}
+            onClick={() => setStage(useCraftPath ? 'craftIntro' : 'module')}
             style={{ marginTop: '1rem' }}
           >
             Begin Study

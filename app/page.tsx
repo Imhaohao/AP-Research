@@ -19,7 +19,7 @@ export default function Home() {
   const [participantEmail, setParticipantEmail] = useState('');
 
   async function handleAccessCodeSubmit() {
-    const code = accessCode.trim().toUpperCase();
+    const code = accessCode.trim();
     if (!code) {
       setAccessCodeError('Please enter your access code.');
       return;
@@ -62,7 +62,7 @@ export default function Home() {
               type="text"
               value={accessCode}
               onChange={(e) => {
-                setAccessCode(e.target.value.toUpperCase());
+                setAccessCode(e.target.value);
                 setAccessCodeError('');
               }}
               onKeyDown={(e) => {
@@ -91,6 +91,10 @@ export default function Home() {
           <p className="auth-footnote">
             Don&apos;t have an accesscode and want to participate?{' '}
             <Link href="/signup">Sign up here</Link>.
+          </p>
+          <p className="auth-footnote">
+            Need to update your availability for PRIME/Study Hall?{' '}
+            <Link href="/availability">Update availability here</Link>.
           </p>
         </section>
       </main>

@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
   }
 
-  const accessCode = (body.access_code ?? '').trim().toUpperCase();
+  const accessCode = (body.access_code ?? '').trim();
   if (!accessCode) {
     return NextResponse.json({ error: 'Access code is required.' }, { status: 400 });
   }
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase
     .from('study_participants')
     .select('login_id,email,full_name')
-    .eq('access_code', accessCode)
+    .ilike('access_code', accessCode)
     .maybeSingle();
 
   if (error) {

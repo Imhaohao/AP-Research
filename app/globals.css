@@ -641,6 +641,54 @@ select {
   color: var(--paly-green-dark);
 }
 
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.8rem;
+}
+
+.admin-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.8rem;
+  background: #fff;
+}
+
+.admin-card h3 {
+  margin: 0 0 0.45rem;
+  font-size: 0.98rem;
+  color: var(--paly-green-dark);
+}
+
+.admin-card p {
+  margin: 0.2rem 0;
+  font-size: 0.9rem;
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  background: #fff;
+}
+
+.admin-table th,
+.admin-table td {
+  border: 1px solid var(--border-light);
+  padding: 0.55rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.admin-table th {
+  background: var(--paly-green-light);
+  color: var(--paly-green-dark);
+}
+
 .floating-back-button {
   position: fixed;
   left: 1rem;
