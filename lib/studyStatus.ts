@@ -1,18 +1,3 @@
-type SupabaseLikeClient = {
-  from: (table: string) => {
-    select: (columns: string) => {
-      eq: (column: string, value: unknown) => {
-        maybeSingle: () => Promise<{ data: any; error: { message: string } | null }>;
-      };
-    };
-    upsert: (values: Record<string, unknown>, options?: { onConflict?: string }) => {
-      select: (columns: string) => {
-        single: () => Promise<{ data: any; error: { message: string } | null }>;
-      };
-    };
-  };
-};
-
 export type StudyStatusResult = {
   isOpen: boolean;
   updatedAt: string | null;
@@ -20,7 +5,7 @@ export type StudyStatusResult = {
   warning?: string;
 };
 
-export async function fetchStudyStatus(supabase: SupabaseLikeClient): Promise<StudyStatusResult> {
+export async function fetchStudyStatus(supabase: any): Promise<StudyStatusResult> {
   const { data, error } = await supabase
     .from('study_config')
     .select('is_open,updated_at')
@@ -52,7 +37,7 @@ export async function fetchStudyStatus(supabase: SupabaseLikeClient): Promise<St
 }
 
 export async function upsertStudyStatus(
-  supabase: SupabaseLikeClient,
+  supabase: any,
   isOpen: boolean
 ): Promise<{ isOpen: boolean; updatedAt: string | null; error?: string }> {
   const { data, error } = await supabase
