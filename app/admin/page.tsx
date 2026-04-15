@@ -24,6 +24,13 @@ type Participant = {
   created_at: string;
 };
 
+type StudyStatus = {
+  is_open: boolean;
+  updated_at: string | null;
+  source?: string;
+  warning?: string | null;
+};
+
 const DEFAULT_ADMIN_CODE = 'Triangle123!.';
 
 export default function AdminPage() {
@@ -33,6 +40,9 @@ export default function AdminPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [studyStatus, setStudyStatus] = useState<StudyStatus | null>(null);
+  const [studyStatusMessage, setStudyStatusMessage] = useState('');
+  const [isUpdatingStudyStatus, setIsUpdatingStudyStatus] = useState(false);
   const [subject, setSubject] = useState('AP Research update');
   const [html, setHtml] = useState(
     `<p>Hi {{first_name}},</p>
@@ -90,15 +100,18 @@ export default function AdminPage() {
     setIsLoading(true);
     setErrorMessage('');
     try {
-      const [statsRes, participantRes] = await Promise.all([
+      const [statsRes, participantRes, studyStatusRes] = await Promise.all([
         fetch('/api/admin/stats', { headers: { 'x-admin-code': code } }),
         fetch('/api/admin/participants', { headers: { 'x-admin-code': code } }),
+        fetch('/api/admin/study-status', { headers: { 'x-admin-code': code } }),
       ]);
 
       const statsPayload = await readApiResponse(statsRes);
       const participantsPayload = await readApiResponse(participantRes);
+      const studyStatusPayload = await readApiResponse(studyStatusRes);
       const statsJson = statsPayload.json;
       const participantsJson = participantsPayload.json;
+      const studyStatusJson = studyStatusPayload.json;
 
       if (!statsRes.ok) {
         const fallback =
@@ -116,9 +129,19 @@ export default function AdminPage() {
           participantsJson?.error || `Failed to load participants (${participantRes.status}). ${fallback}`
         );
       }
+      if (!studyStatusRes.ok) {
+        const fallback =
+          studyStatusPayload.text && studyStatusPayload.text.includes('<!DOCTYPE')
+            ? 'Study status API returned HTML (likely not deployed / wrong route).'
+            : studyStatusPayload.text || 'Failed to load study status.';
+        throw new Error(
+          studyStatusJson?.error || `Failed to load study status (${studyStatusRes.status}). ${fallback}`
+        );
+      }
 
       setStats(statsJson as AdminStats);
       setParticipants((participantsJson.participants ?? []) as Participant[]);
+      setStudyStatus(studyStatusJson as StudyStatus);
       setAdminCode(code);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Could not load admin data.');
@@ -175,6 +198,43 @@ export default function AdminPage() {
     }
   }
 
+  async function handleStudyStatusUpdate(nextIsOpen: boolean) {
+    if (!adminCode) return;
+    setIsUpdatingStudyStatus(true);
+    setStudyStatusMessage('');
+    try {
+      const response = await fetch('/api/admin/study-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-code': adminCode,
+        },
+        body: JSON.stringify({ is_open: nextIsOpen }),
+      });
+      const payload = await readApiResponse(response);
+      const json = payload.json;
+      if (!response.ok) {
+        const fallback =
+          payload.text && payload.text.includes('<!DOCTYPE')
+            ? 'Study status update API returned HTML (likely not deployed / wrong route).'
+            : payload.text || 'Failed to update study status.';
+        throw new Error(json?.error || `Failed to update study status (${response.status}). ${fallback}`);
+      }
+
+      setStudyStatus((prev) => ({
+        is_open: json?.is_open === true,
+        updated_at: json?.updated_at ?? prev?.updated_at ?? null,
+        source: prev?.source ?? 'table',
+        warning: null,
+      }));
+      setStudyStatusMessage(nextIsOpen ? 'Study is now OPEN to participants.' : 'Study is now CLOSED.');
+    } catch (error) {
+      setStudyStatusMessage(error instanceof Error ? error.message : 'Failed to update study status.');
+    } finally {
+      setIsUpdatingStudyStatus(false);
+    }
+  }
+
   return (
     <main className="signup-shell">
       <section className="signup-card">
@@ -200,6 +260,41 @@ export default function AdminPage() {
           </div>
         ) : (
           <>
+            <section className="signup-section">
+              <h2>Study access control</h2>
+              <p>
+                Status:{' '}
+                <strong>{studyStatus?.is_open === false ? 'Closed (not accessible)' : 'Open (accessible)'}</strong>
+              </p>
+              {studyStatus?.updated_at ? (
+                <p style={{ marginTop: '0.3rem' }}>
+                  Last updated: {new Date(studyStatus.updated_at).toLocaleString()}
+                </p>
+              ) : null}
+              {studyStatus?.warning ? (
+                <p className="auth-error" style={{ marginTop: '0.45rem' }}>
+                  Status warning: {studyStatus.warning}
+                </p>
+              ) : null}
+              <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginTop: '0.6rem' }}>
+                <button
+                  type="button"
+                  onClick={() => void handleStudyStatusUpdate(true)}
+                  disabled={isUpdatingStudyStatus || studyStatus?.is_open === true}
+                >
+                  {isUpdatingStudyStatus && studyStatus?.is_open !== true ? 'Updating...' : 'Open study'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleStudyStatusUpdate(false)}
+                  disabled={isUpdatingStudyStatus || studyStatus?.is_open === false}
+                >
+                  {isUpdatingStudyStatus && studyStatus?.is_open !== false ? 'Updating...' : 'Close study'}
+                </button>
+              </div>
+              {studyStatusMessage ? <p style={{ marginTop: '0.6rem' }}>{studyStatusMessage}</p> : null}
+            </section>
+
             <section className="signup-section">
               <h2>Trends so far</h2>
               {stats ? (

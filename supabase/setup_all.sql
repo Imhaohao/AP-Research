@@ -112,6 +112,19 @@ alter table public.study_chat_turns
   add constraint study_chat_turns_participant_login_id_fkey
   foreign key (participant_login_id) references public.study_participants(login_id);
 
+-- ========== study_config (admin-controlled study access toggle) ==========
+create table if not exists public.study_config (
+  id smallint primary key,
+  is_open boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+
+insert into public.study_config (id, is_open)
+values (1, true)
+on conflict (id) do nothing;
+
+alter table public.study_config enable row level security;
+
 -- ========== systematic 3-arm sequence (atomic with service role + RPC) ==========
 create table if not exists public.study_participant_sequence (
   singleton boolean primary key default true,

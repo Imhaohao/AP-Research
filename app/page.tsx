@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import PromptStudy from '@/components/PromptStudy';
 
 type AccessResolveResponse = {
@@ -11,14 +11,46 @@ type AccessResolveResponse = {
   error?: string;
 };
 
+type StudyStatusResponse = {
+  is_open?: boolean;
+};
+
 export default function Home() {
   const [accessCode, setAccessCode] = useState('');
   const [accessCodeError, setAccessCodeError] = useState('');
   const [isResolvingCode, setIsResolvingCode] = useState(false);
   const [participantLoginId, setParticipantLoginId] = useState('');
   const [participantEmail, setParticipantEmail] = useState('');
+  const [isStudyOpen, setIsStudyOpen] = useState(true);
+  const [isCheckingStudyStatus, setIsCheckingStudyStatus] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadStudyStatus() {
+      try {
+        const response = await fetch('/api/study/status', { cache: 'no-store' });
+        const json = (await response.json()) as StudyStatusResponse;
+        if (cancelled) return;
+        setIsStudyOpen(json.is_open !== false);
+      } catch {
+        if (cancelled) return;
+        setIsStudyOpen(true);
+      } finally {
+        if (!cancelled) setIsCheckingStudyStatus(false);
+      }
+    }
+    void loadStudyStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleAccessCodeSubmit() {
+    if (!isStudyOpen) {
+      setAccessCodeError('The study is currently closed. Please check back later.');
+      return;
+    }
+
     const code = accessCode.trim();
     if (!code) {
       setAccessCodeError('Please enter your access code.');
@@ -55,6 +87,11 @@ export default function Home() {
           <p className="auth-subtext">
             Use the code sent to your email to begin the experiment. Your responses are saved anonymously for research.
           </p>
+          {!isStudyOpen ? (
+            <p className="auth-error" role="status">
+              The study is currently closed. Please check back later.
+            </p>
+          ) : null}
           <div className="auth-field">
             <label htmlFor="access-code-input">Access code</label>
             <input
@@ -83,10 +120,16 @@ export default function Home() {
           <button
             type="button"
             onClick={() => void handleAccessCodeSubmit()}
-            disabled={isResolvingCode || !accessCode.trim()}
+            disabled={isResolvingCode || isCheckingStudyStatus || !isStudyOpen || !accessCode.trim()}
             className="auth-submit"
           >
-            {isResolvingCode ? 'Checking code...' : 'Continue to study'}
+            {isCheckingStudyStatus
+              ? 'Checking study status...'
+              : isResolvingCode
+                ? 'Checking code...'
+                : !isStudyOpen
+                  ? 'Study currently closed'
+                  : 'Continue to study'}
           </button>
           <p className="auth-footnote">
             Don&apos;t have an accesscode and want to participate?{' '}

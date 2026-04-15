@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { fetchStudyStatus } from '@/lib/studyStatus';
 
 type ResolveBody = {
   access_code?: string;
@@ -29,6 +30,14 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = createClient(url, serviceRoleKey);
+  const status = await fetchStudyStatus(supabase);
+  if (!status.isOpen) {
+    return NextResponse.json(
+      { error: 'The study is currently closed. Please check back later.' },
+      { status: 403 }
+    );
+  }
+
   const { data, error } = await supabase
     .from('study_participants')
     .select('login_id,email,full_name')
