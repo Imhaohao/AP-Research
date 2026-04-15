@@ -10,7 +10,12 @@ type SignupBody = {
   agree?: boolean;
   name?: string;
   email?: string;
-  available_prime?: boolean;
+  availability?: {
+    in_person_interest?: 'yes' | 'no' | '';
+    in_person_dates?: string[];
+    after_school_interest?: 'yes' | 'no' | '';
+    after_school_dates?: string[];
+  };
   grade?: GradeValue;
   likert?: {
     ai_use_frequency?: number;
@@ -27,6 +32,13 @@ type SignupBody = {
     ai_school_concerns?: string;
   };
 };
+
+type AvailabilityLabel =
+  | 'prime'
+  | 'study_hall'
+  | 'prime_and_study_hall'
+  | 'after_school'
+  | 'async';
 
 function isLikert(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) >= 1 && Number(value) <= 5;
@@ -69,12 +81,23 @@ function buildEmailHtml(params: {
   loginId: string;
   accessCode: string;
   grade: GradeValue;
-  availablePrime: boolean;
+  availabilityLabel: AvailabilityLabel;
+  availabilitySlots: string[];
   likert: Record<string, number>;
   freeResponse: Record<string, string | null>;
   appUrl: string;
 }) {
-  const { name, loginId, accessCode, grade, availablePrime, likert, freeResponse, appUrl } = params;
+  const {
+    name,
+    loginId,
+    accessCode,
+    grade,
+    availabilityLabel,
+    availabilitySlots,
+    likert,
+    freeResponse,
+    appUrl,
+  } = params;
   return `
     <div style="font-family: Inter, Arial, sans-serif; line-height: 1.5; color: #1f2937;">
       <h2 style="margin-bottom: 8px;">AP Research Experiment Signup Confirmation</h2>
@@ -91,7 +114,8 @@ function buildEmailHtml(params: {
       <h3 style="margin-bottom: 8px;">Your submitted details</h3>
       <ul>
         <li><strong>Grade:</strong> ${grade}</li>
-        <li><strong>Available during PRIME:</strong> ${availablePrime ? 'Yes' : 'No'}</li>
+        <li><strong>Availability label:</strong> ${availabilityLabel}</li>
+        <li><strong>Selected slots:</strong> ${availabilitySlots.length ? availabilitySlots.join(', ') : 'None (async)'}</li>
       </ul>
       <p><strong>Likert responses:</strong></p>
       <ul>
@@ -135,7 +159,7 @@ export async function POST(request: NextRequest) {
   const name = normalizeText(body.name);
   const emailRaw = normalizeText(body.email);
   const email = emailRaw?.toLowerCase() ?? null;
-  const availablePrime = body.available_prime === true;
+  const availability = body.availability ?? {};
   const grade = body.grade;
   const likert = body.likert;
   const freeResponse = body.free_response ?? {};
@@ -163,6 +187,68 @@ export async function POST(request: NextRequest) {
     !isLikert(likert.responsible_learning_belief)
   ) {
     return NextResponse.json({ error: 'All Likert answers must be selected (1-5).' }, { status: 400 });
+  }
+
+  const inPersonInterest = availability.in_person_interest;
+  const inPersonDates = Array.isArray(availability.in_person_dates)
+    ? availability.in_person_dates.filter((d) => typeof d === 'string' && d.trim())
+    : [];
+  const afterSchoolInterest = availability.after_school_interest;
+  const afterSchoolDates = Array.isArray(availability.after_school_dates)
+    ? availability.after_school_dates.filter((d) => typeof d === 'string' && d.trim())
+    : [];
+
+  let availabilityLabel: AvailabilityLabel;
+  let availabilitySlots: string[] = [];
+
+  if (inPersonInterest === 'yes') {
+    if (inPersonDates.length === 0) {
+      return NextResponse.json(
+        { error: 'Select at least one PRIME or Study Hall slot in the next two weeks.' },
+        { status: 400 }
+      );
+    }
+    const hasPrime = inPersonDates.some((d) => {
+      const day = new Date(d).getDay();
+      return day === 3;
+    });
+    const hasStudyHall = inPersonDates.some((d) => {
+      const day = new Date(d).getDay();
+      return day === 5;
+    });
+    availabilityLabel = hasPrime && hasStudyHall
+      ? 'prime_and_study_hall'
+      : hasPrime
+        ? 'prime'
+        : 'study_hall';
+    availabilitySlots = inPersonDates;
+  } else if (inPersonInterest === 'no') {
+    if (afterSchoolInterest === 'yes') {
+      if (afterSchoolDates.length === 0) {
+        return NextResponse.json(
+          { error: 'Please select at least one after-school date in the next two weeks.' },
+          { status: 400 }
+        );
+      }
+      availabilityLabel = 'after_school';
+      availabilitySlots = afterSchoolDates;
+    } else if (afterSchoolInterest === 'no') {
+      availabilityLabel = 'async';
+      availabilitySlots = [];
+    } else {
+      return NextResponse.json(
+        { error: 'Please answer whether you can meet after school for under an hour.' },
+        { status: 400 }
+      );
+    }
+  } else {
+    return NextResponse.json(
+      {
+        error:
+          'Please answer availability for PRIME or Study Hall first.',
+      },
+      { status: 400 }
+    );
   }
 
   const supabase = createClient(url, serviceRoleKey);
@@ -195,7 +281,9 @@ export async function POST(request: NextRequest) {
       access_code: accessCode,
       email,
       full_name: name,
-      available_prime: availablePrime,
+      available_prime: availabilityLabel === 'prime' || availabilityLabel === 'prime_and_study_hall',
+      availability_label: availabilityLabel,
+      availability_slots: availabilitySlots,
       grade,
       likert,
       free_response: freePayload,
@@ -235,7 +323,8 @@ export async function POST(request: NextRequest) {
         loginId,
         accessCode,
         grade,
-        availablePrime,
+        availabilityLabel,
+        availabilitySlots,
         likert: {
           ai_use_frequency: likert.ai_use_frequency,
           prompt_confidence: likert.prompt_confidence,

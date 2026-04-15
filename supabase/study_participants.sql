@@ -7,6 +7,8 @@ create table if not exists public.study_participants (
   email text unique not null,
   full_name text not null,
   available_prime boolean not null default false,
+  availability_label text not null default 'async',
+  availability_slots jsonb not null default '[]'::jsonb,
   grade text not null,
   likert jsonb not null,
   free_response jsonb not null,
@@ -27,6 +29,13 @@ update public.study_participants
 set access_code = 'AC' || lpad(substring(login_id from '[0-9]+'), 4, '0')
 where access_code is null
   and substring(login_id from '[0-9]+') is not null;
+
+update public.study_participants
+set
+  availability_label = case when available_prime then 'prime' else 'async' end,
+  availability_slots = coalesce(availability_slots, '[]'::jsonb)
+where availability_label is null
+   or availability_slots is null;
 
 alter table public.study_participants
   alter column access_code set not null;
@@ -85,6 +94,8 @@ set
   email = excluded.email,
   full_name = excluded.full_name,
   available_prime = excluded.available_prime,
+  availability_label = coalesce(excluded.availability_label, public.study_participants.availability_label),
+  availability_slots = coalesce(excluded.availability_slots, public.study_participants.availability_slots),
   grade = excluded.grade,
   likert = excluded.likert,
   free_response = excluded.free_response,

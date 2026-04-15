@@ -7,6 +7,12 @@ alter table if exists public.study_participants
 alter table if exists public.study_participants
   alter column access_code set default upper(substr(md5(gen_random_uuid()::text), 1, 8));
 
+alter table if exists public.study_participants
+  add column if not exists availability_label text;
+
+alter table if exists public.study_participants
+  add column if not exists availability_slots jsonb;
+
 update public.study_participants
 set access_code = 'AC' || lpad(substring(login_id from '[0-9]+'), 4, '0')
 where access_code is null
@@ -19,6 +25,23 @@ where access_code is null;
 
 alter table if exists public.study_participants
   alter column access_code set not null;
+
+update public.study_participants
+set
+  availability_label = coalesce(availability_label, case when available_prime then 'prime' else 'async' end),
+  availability_slots = coalesce(availability_slots, '[]'::jsonb);
+
+alter table if exists public.study_participants
+  alter column availability_label set default 'async';
+
+alter table if exists public.study_participants
+  alter column availability_label set not null;
+
+alter table if exists public.study_participants
+  alter column availability_slots set default '[]'::jsonb;
+
+alter table if exists public.study_participants
+  alter column availability_slots set not null;
 
 create unique index if not exists study_participants_access_code_idx
   on public.study_participants (access_code);

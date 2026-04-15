@@ -576,6 +576,71 @@ select {
   margin: 0.35rem 0;
 }
 
+.signup-disclosure {
+  margin-bottom: 1.25rem;
+}
+
+.signup-disclosure h2 {
+  margin-bottom: 0.75rem;
+}
+
+.signup-disclosure h3 {
+  margin-top: 1rem;
+  margin-bottom: 0.35rem;
+  font-size: 1rem;
+  color: var(--paly-green-dark);
+}
+
+.signup-disclosure p {
+  margin-top: 0.35rem;
+  margin-bottom: 0.45rem;
+}
+
+.signup-disclosure ol,
+.signup-disclosure ul {
+  margin: 0.3rem 0 0.65rem 1.2rem;
+}
+
+.signup-disclosure li {
+  margin-bottom: 0.3rem;
+}
+
+.availability-chip-grid,
+.availability-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.6rem;
+}
+
+.availability-chip {
+  min-height: 44px;
+  text-align: left;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  box-shadow: none;
+}
+
+.availability-chip:hover:not(:disabled) {
+  background: var(--paly-green-light);
+  border-color: var(--paly-green);
+  transform: none;
+  box-shadow: none;
+}
+
+.availability-chip.active {
+  background: var(--paly-green-light);
+  border-color: var(--paly-green);
+  color: var(--paly-green-dark);
+}
+
+.signup-note {
+  margin-top: 0.8rem;
+  margin-bottom: 0;
+  font-weight: 500;
+  color: var(--paly-green-dark);
+}
+
 @media (max-width: 900px) {
   .signup-grid {
     grid-template-columns: 1fr;

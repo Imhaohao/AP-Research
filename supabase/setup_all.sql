@@ -87,6 +87,8 @@ create table if not exists public.study_participants (
   email text unique not null,
   full_name text not null,
   available_prime boolean not null default false,
+  availability_label text not null default 'async',
+  availability_slots jsonb not null default '[]'::jsonb,
   grade text not null,
   likert jsonb not null,
   free_response jsonb not null,
