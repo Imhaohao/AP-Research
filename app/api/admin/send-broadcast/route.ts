@@ -144,12 +144,19 @@ export async function POST(request: NextRequest) {
       const personalizedHtml = renderTemplate(html, participant, appUrl);
 
       try {
-        await resend.emails.send({
+        const sendResult = await resend.emails.send({
           from: resendFrom,
           to: [to],
           subject: personalizedSubject,
           html: personalizedHtml,
         });
+        if (sendResult?.error) {
+          failures.push({
+            email: to,
+            error: sendResult.error.message || 'Resend returned an unknown error.',
+          });
+          continue;
+        }
         sentCount += 1;
       } catch (error) {
         failures.push({
