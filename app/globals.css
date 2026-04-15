@@ -641,6 +641,25 @@ select {
   color: var(--paly-green-dark);
 }
 
+.floating-back-button {
+  position: fixed;
+  left: 1rem;
+  bottom: 1rem;
+  z-index: 30;
+  min-height: 44px;
+  padding: 0.7rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: var(--paly-green-dark);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.floating-back-button:hover:not(:disabled) {
+  background: var(--paly-green-light);
+  border-color: var(--paly-green);
+}
+
 @media (max-width: 900px) {
   .signup-grid {
     grid-template-columns: 1fr;

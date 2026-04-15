@@ -379,6 +379,15 @@ export default function PromptStudy({
   };
 
   const currentStep = flowStages.indexOf(stage);
+  const canGoBack = currentStep > 0 && stage !== 'complete';
+
+  function goToPreviousStage() {
+    if (currentStep <= 0) return;
+    const prev = flowStages[currentStep - 1];
+    if (prev) {
+      setStage(prev);
+    }
+  }
 
   function renderProgressBar() {
     const steps = flowStages.slice(0, -1);
@@ -2043,6 +2052,15 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
 
   return (
     <div>
+      {canGoBack ? (
+        <button
+          type="button"
+          className="floating-back-button"
+          onClick={goToPreviousStage}
+        >
+          Back
+        </button>
+      ) : null}
       <div className="lms-header">
         <h1>✨ Prompty+</h1>
       </div>

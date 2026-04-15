@@ -109,7 +109,7 @@ function buildEmailHtml(params: {
       <p>Your participant login ID is: <strong>${loginId}</strong></p>
       <p>Use this link to return to the study start page:</p>
       <p><a href="${appUrl}">${appUrl}</a></p>
-
+      <p>If you have any questions, please email <a href="mailto:zy53492@pausd.us">zy53492@pausd.us</a>. Please do NOT reply to this email.</p>
       <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
       <h3 style="margin-bottom: 8px;">Your submitted details</h3>
       <ul>
