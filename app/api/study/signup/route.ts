@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { NextRequest, NextResponse } from 'next/server';
+import { notifyDatabaseChange } from '@/lib/dbChangeAlerts';
 
 const GRADE_VALUES = ['Freshman', 'Sophomore', 'Junior', 'Senior'] as const;
 
@@ -306,6 +307,20 @@ export async function POST(request: NextRequest) {
   const resendApiKey = process.env.RESEND_API_KEY;
   const resendFrom = process.env.RESEND_FROM_EMAIL || 'AP Research <onboarding@resend.dev>';
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin || 'http://localhost:3000';
+
+  await notifyDatabaseChange({
+    table: 'study_participants',
+    action: existing ? 'signup_upsert_existing' : 'signup_insert',
+    appUrl,
+    details: {
+      login_id: loginId,
+      email,
+      full_name: name,
+      availability_label: availabilityLabel,
+      availability_slots: availabilitySlots,
+      grade,
+    },
+  });
 
   if (!resendApiKey) {
     return NextResponse.json(

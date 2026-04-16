@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { notifyDatabaseChange } from '@/lib/dbChangeAlerts';
 
 const STUDY_GROUPS = [
   'control',
@@ -110,6 +111,17 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: retryError.message }, { status: 500 });
       }
 
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin || 'http://localhost:3000';
+      await notifyDatabaseChange({
+        table: 'study_results',
+        action: 'submit_upsert_retry_without_optional_columns',
+        appUrl,
+        details: {
+          client_submission_id,
+          study_group,
+        },
+      });
+
       return NextResponse.json({
         ok: true,
         warning:
@@ -120,6 +132,20 @@ export async function POST(request: NextRequest) {
     console.error('Supabase upsert error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin || 'http://localhost:3000';
+  await notifyDatabaseChange({
+    table: 'study_results',
+    action: 'submit_upsert',
+    appUrl,
+    details: {
+      client_submission_id,
+      study_group,
+      participant_login_id: participantLoginId,
+      participant_email: participantEmail,
+      lottery_opt_in: lotteryOptIn,
+    },
+  });
 
   return NextResponse.json({ ok: true });
 }

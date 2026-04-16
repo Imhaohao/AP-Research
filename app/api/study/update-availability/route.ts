@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { notifyDatabaseChange } from '@/lib/dbChangeAlerts';
 
 type AvailabilityBody = {
   access_code?: string;
@@ -118,6 +119,19 @@ export async function POST(request: NextRequest) {
   if (updateErr) {
     return NextResponse.json({ error: updateErr.message }, { status: 500 });
   }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin || 'http://localhost:3000';
+  await notifyDatabaseChange({
+    table: 'study_participants',
+    action: 'availability_update',
+    appUrl,
+    details: {
+      login_id: existing.login_id,
+      access_code: accessCode,
+      availability_label: availabilityLabel,
+      availability_slots: availabilitySlots,
+    },
+  });
 
   return NextResponse.json({
     ok: true,

@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchStudyStatus, upsertStudyStatus } from '@/lib/studyStatus';
+import { notifyDatabaseChange } from '@/lib/dbChangeAlerts';
 
 function getExpectedAdminCode(): string {
   return process.env.ADMIN_ACCESS_CODE || 'Triangle123!.';
@@ -71,6 +72,16 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+
+  await notifyDatabaseChange({
+    table: 'study_config',
+    action: 'admin_study_status_update',
+    appUrl: process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin || 'http://localhost:3000',
+    details: {
+      is_open: result.isOpen,
+      updated_at: result.updatedAt,
+    },
+  });
 
   return NextResponse.json({
     ok: true,
