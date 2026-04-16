@@ -18,6 +18,9 @@ type ParticipantRow = {
   availability_slots: string[] | null;
 };
 
+const BROADCAST_SEND_DELAY_MS = 250;
+const BROADCAST_SEND_MAX_RETRIES = 3;
+
 function getExpectedAdminCode(): string {
   return process.env.ADMIN_ACCESS_CODE || 'Triangle123!.';
 }
@@ -52,6 +55,19 @@ function renderTemplate(template: string, participant: ParticipantRow, appUrl: s
     rendered = rendered.replace(pattern, value);
   }
   return rendered;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function isRateLimitedError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const maybeError = error as { statusCode?: number; status?: number; message?: string };
+  if (maybeError.statusCode === 429 || maybeError.status === 429) return true;
+  return typeof maybeError.message === 'string' && maybeError.message.includes('429');
 }
 
 export async function POST(request: NextRequest) {
@@ -144,25 +160,65 @@ export async function POST(request: NextRequest) {
       const personalizedHtml = renderTemplate(html, participant, appUrl);
 
       try {
-        const sendResult = await resend.emails.send({
-          from: resendFrom,
-          to: [to],
-          subject: personalizedSubject,
-          html: personalizedHtml,
-        });
-        if (sendResult?.error) {
-          failures.push({
-            email: to,
-            error: sendResult.error.message || 'Resend returned an unknown error.',
+        let delivered = false;
+        for (let attempt = 0; attempt <= BROADCAST_SEND_MAX_RETRIES; attempt += 1) {
+          const sendResult = await resend.emails.send({
+            from: resendFrom,
+            to: [to],
+            subject: personalizedSubject,
+            html: personalizedHtml,
           });
+          if (!sendResult?.error) {
+            sentCount += 1;
+            delivered = true;
+            break;
+          }
+          if (!isRateLimitedError(sendResult.error) || attempt === BROADCAST_SEND_MAX_RETRIES) {
+            failures.push({
+              email: to,
+              error: sendResult.error.message || 'Resend returned an unknown error.',
+            });
+            break;
+          }
+          // Back off progressively when Resend returns 429.
+          await sleep(BROADCAST_SEND_DELAY_MS * (attempt + 2));
+        }
+
+        if (!delivered) {
           continue;
         }
-        sentCount += 1;
       } catch (error) {
-        failures.push({
-          email: to,
-          error: error instanceof Error ? error.message : 'Unknown send error.',
-        });
+        if (isRateLimitedError(error)) {
+          try {
+            await sleep(BROADCAST_SEND_DELAY_MS * 2);
+            const retryResult = await resend.emails.send({
+              from: resendFrom,
+              to: [to],
+              subject: personalizedSubject,
+              html: personalizedHtml,
+            });
+            if (!retryResult?.error) {
+              sentCount += 1;
+            } else {
+              failures.push({
+                email: to,
+                error: retryResult.error.message || 'Resend returned an unknown error.',
+              });
+            }
+          } catch (retryError) {
+            failures.push({
+              email: to,
+              error: retryError instanceof Error ? retryError.message : 'Unknown send error.',
+            });
+          }
+        } else {
+          failures.push({
+            email: to,
+            error: error instanceof Error ? error.message : 'Unknown send error.',
+          });
+        }
+      } finally {
+        await sleep(BROADCAST_SEND_DELAY_MS);
       }
     }
 
