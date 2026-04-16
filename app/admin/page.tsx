@@ -78,6 +78,28 @@ export default function AdminPage() {
     });
   }, [participants]);
 
+  const participantAvailabilityRows = useMemo(() => {
+    return [...participants].sort((a, b) => {
+      const aName = (a.full_name || '').trim().toLowerCase();
+      const bName = (b.full_name || '').trim().toLowerCase();
+      return aName.localeCompare(bName);
+    });
+  }, [participants]);
+
+  function formatAvailabilitySlots(slots: string[] | null): string {
+    if (!Array.isArray(slots) || slots.length === 0) {
+      return 'None (async)';
+    }
+
+    return slots
+      .map((slot) => {
+        const parsed = new Date(slot);
+        if (Number.isNaN(parsed.getTime())) return slot;
+        return parsed.toLocaleDateString();
+      })
+      .join(', ');
+  }
+
   async function readApiResponse(response: Response): Promise<{ json: any | null; text: string | null }> {
     const contentType = response.headers.get('content-type') || '';
     if (contentType.includes('application/json')) {
@@ -414,6 +436,34 @@ export default function AdminPage() {
                     : 'Send to all participants'}
               </button>
               {sendMessage ? <p>{sendMessage}</p> : null}
+            </section>
+
+            <section className="signup-section">
+              <h2>All participant availability</h2>
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Availability type</th>
+                      <th>Selected slots</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {participantAvailabilityRows.map((participant) => (
+                      <tr key={`availability-${participant.login_id}-${participant.email}`}>
+                        <td>{participant.full_name}</td>
+                        <td>{participant.email}</td>
+                        <td>{participant.availability_label || 'async'}</td>
+                        <td style={{ whiteSpace: 'normal' }}>
+                          {formatAvailabilitySlots(participant.availability_slots)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </section>
 
             <section className="signup-section">

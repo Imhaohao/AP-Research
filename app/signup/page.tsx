@@ -413,7 +413,10 @@ export default function SignupPage() {
             {form.availability.in_person_interest === 'yes' ? (
               <section className="signup-section">
                 <h2>Select PRIME / Study Hall slots (next 2 weeks)</h2>
-                <p>Study Hall is Friday, PRIME is Wednesday. Choose all that you can attend in-person.</p>
+                <p>
+                  Study Hall is Friday, PRIME is Wednesday. For PRIME, sign up for HB prime (Samuel
+                  Howles-Banerji). Choose all that you can attend in-person.
+                </p>
                 <div className="availability-chip-grid">
                   {inPersonSlots.map((slot) => (
                     <button

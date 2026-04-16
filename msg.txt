@@ -1,0 +1,71 @@
+<div style="font-family: Inter, Arial, sans-serif; color: #1f2937; line-height: 1.6; max-width: 640px;">
+  <p>Hi {{first_name}},</p>
+
+  <p>
+    Quick AP Research update: please take 1-2 minutes to update your availability.
+    This helps us finalize scheduling for PRIME / Study Hall and after-school sessions.
+  </p>
+
+  <p>
+    <strong>Your access code:</strong><br />
+    <span
+      style="
+        display: inline-block;
+        margin-top: 6px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        background: #f3f4f6;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+      "
+    >
+      {{access_code}}
+    </span>
+  </p>
+
+  <p>
+    <strong>What we currently have on file:</strong><br />
+    Availability type: {{availability_label}}<br />
+    Selected slots: {{availability_slots}}
+  </p>
+
+  <p>
+    <strong>Step 1: Update your availability</strong><br />
+    <a href="{{availability_url}}" target="_blank" rel="noopener noreferrer">
+      {{availability_url}}
+    </a>
+  </p>
+
+  <p>
+    If you plan to attend PRIME, please sign up for HB prime (Samuel Howles-Banerji).
+  </p>
+
+  <p>
+    Use your access code above when submitting your update.
+  </p>
+
+  <p>
+    <strong>Step 2: Access the experiment this Friday (April 15)</strong><br />
+    <a href="https://apr-sooty.vercel.app/" target="_blank" rel="noopener noreferrer">
+      apr-sooty.vercel.app
+    </a>
+  </p>
+
+  <p>
+    If you can attend in person (PRIME or Study Hall), you have a higher chance in the raffle.
+    If those times do not work, you can still participate asynchronously.
+  </p>
+
+  <p>Thanks for helping us keep the study organized!</p>
+
+  <p>
+    Best,<br />
+    Jerry Yan<br />
+    AP Research<br />
+    <a href="https://apr-sooty.vercel.app/" target="_blank" rel="noopener noreferrer">
+      apr-sooty.vercel.app
+    </a><br />
+    Please do not reply to this email. If you have any questions, please email
+    <a href="mailto:zy53492@pausd.us">zy53492@pausd.us</a>.
+  </p>
+</div>
