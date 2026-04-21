@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { notifyDatabaseChange } from '@/lib/dbChangeAlerts';
+import { Resend } from 'resend';
 
 const STUDY_GROUPS = [
   'control',
@@ -27,6 +28,53 @@ function isMissingColumnError(error: { code?: string; message?: string }): boole
     error.code === 'PGRST204' ||
     /could not find the '.*' column of 'study_results' in the schema cache/i.test(error.message ?? '')
   );
+}
+
+function isStudyGroupConstraintError(error: { code?: string; message?: string }): boolean {
+  return (
+    error.code === '23514' ||
+    /study_results_study_group_check/i.test(error.message ?? '') ||
+    /violates check constraint.*study_group_check/i.test(error.message ?? '')
+  );
+}
+
+function buildThankYouEmailHtml(params: {
+  participantEmail: string;
+  lotteryOptIn: boolean | null;
+  appUrl: string;
+}) {
+  const { participantEmail, lotteryOptIn, appUrl } = params;
+  const raffleText =
+    lotteryOptIn === true
+      ? 'You are entered into the ChatGPT raffle.'
+      : lotteryOptIn === false
+        ? 'You chose not to enter the ChatGPT raffle.'
+        : 'Your raffle entry status was not recorded.';
+
+  return `
+    <div style="font-family: Inter, Arial, sans-serif; line-height: 1.6; color: #1f2937;">
+      <h2 style="margin: 0 0 12px;">Thank you for participating</h2>
+      <p>Hi ${participantEmail},</p>
+      <p>
+        Thank you for spending your time on this AP Research study. Your response has been successfully submitted.
+      </p>
+      <p>
+        <strong>Raffle status:</strong> ${raffleText}
+      </p>
+      <p>
+        You can return to the study page here:<br />
+        <a href="${appUrl}">${appUrl}</a>
+      </p>
+      <p>
+        We appreciate your participation and support for this research.
+      </p>
+      <p>
+        Best,<br />
+        Jerry Yan<br />
+        AP Research
+      </p>
+    </div>
+  `;
 }
 
 export async function POST(request: NextRequest) {
@@ -100,6 +148,17 @@ export async function POST(request: NextRequest) {
   const { error } = await supabase.from('study_results').upsert(row, { onConflict: 'client_submission_id' });
 
   if (error) {
+    if (isStudyGroupConstraintError(error)) {
+      return NextResponse.json(
+        {
+          error:
+            `study_group value "${study_group}" is blocked by your current database constraint. ` +
+            'Run supabase/fix_study_group_constraint.sql in Supabase SQL Editor, then retry.',
+        },
+        { status: 500 }
+      );
+    }
+
     // If the database hasn't been migrated yet, retry without the new optional columns.
     if (isMissingColumnError(error)) {
       const { error: retryError } = await supabase
@@ -146,6 +205,29 @@ export async function POST(request: NextRequest) {
       lottery_opt_in: lotteryOptIn,
     },
   });
+
+  if (participantEmail) {
+    const resendApiKey = process.env.RESEND_API_KEY;
+    const resendFrom = process.env.RESEND_FROM_EMAIL || 'AP Research <onboarding@resend.dev>';
+    if (resendApiKey) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin || 'http://localhost:3000';
+      try {
+        const resend = new Resend(resendApiKey);
+        await resend.emails.send({
+          from: resendFrom,
+          to: [participantEmail],
+          subject: 'Thank you for participating in AP Research',
+          html: buildThankYouEmailHtml({
+            participantEmail,
+            lotteryOptIn,
+            appUrl,
+          }),
+        });
+      } catch (emailError) {
+        console.error('Failed to send post-submission thank-you email:', emailError);
+      }
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }

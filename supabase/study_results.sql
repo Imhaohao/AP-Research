@@ -2,7 +2,17 @@
 
 create table if not exists public.study_results (
   client_submission_id text primary key,
-  study_group text not null check (study_group in ('control', 'treatment')),
+  study_group text not null check (
+    study_group in (
+      'control',
+      'treatment',
+      'unrestricted_ai',
+      'guided_ai',
+      'prompt_bank_ai'
+    )
+  ),
+  treatment_arm smallint,
+  participant_sequence bigint,
   participant_email text,
   participant_login_id text,
   lottery_opt_in boolean,

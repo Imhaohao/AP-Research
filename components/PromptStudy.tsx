@@ -283,7 +283,6 @@ export default function PromptStudy({
   const [saveMessage, setSaveMessage] = useState('');
   
   // ChatGPT (OpenAI API) writing assistant on the task step
-  const [openAiApiKey, setOpenAiApiKey] = useState('');
   const [openAiMessages, setOpenAiMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
   const [openAiInput, setOpenAiInput] = useState('');
   const [openAiLoading, setOpenAiLoading] = useState(false);
@@ -1131,7 +1130,6 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: fullPrompt,
-          apiKey: openAiApiKey.trim() || undefined,
         }),
       });
 
@@ -1234,7 +1232,7 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
           Continue to Activity 1 — your narrative →
         </button>
       </>,
-      'CRAFT-inspired lesson · Introduction (~10 min)',
+      'Introduction to Prompt Engineering (~10 min)',
       'Self-paced · ~60 min total if you take your time on writing and reflection'
     );
   }
@@ -1329,18 +1327,6 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
               The assistant is given your assignment prompt and your study condition. Ask for feedback or for the sample story; when
               you&apos;re satisfied, use the button below to paste the last reply into the AI story field.
             </p>
-            <div className="form-group" style={{ background: '#fff' }}>
-              <label>
-                API key (optional)
-                <input
-                  type="password"
-                  value={openAiApiKey}
-                  onChange={(e) => setOpenAiApiKey(e.target.value)}
-                  placeholder="Leave blank if your teacher set a server key"
-                  style={{ marginTop: '0.25rem' }}
-                />
-              </label>
-            </div>
             <div
               style={{
                 background: '#fff',
@@ -1621,17 +1607,6 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
             <p style={{ fontSize: '0.9rem' }}>
               The assistant sees your human draft, the AI comparison draft, and your revision box. Ask step by step.
             </p>
-            <div className="form-group" style={{ background: '#fff' }}>
-              <label>
-                API key (optional)
-                <input
-                  type="password"
-                  value={openAiApiKey}
-                  onChange={(e) => setOpenAiApiKey(e.target.value)}
-                  style={{ marginTop: '0.25rem' }}
-                />
-              </label>
-            </div>
             <div
               style={{
                 background: '#fff',
@@ -1939,22 +1914,6 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
                 guide you. Think critically about any suggestions.
               </p>
 
-              <div className="form-group" style={{ background: '#ffffff', borderLeftColor: '#006B3F', marginBottom: '1rem' }}>
-                <label>
-                  <strong>OpenAI API key (optional):</strong>
-                  <input
-                    type="password"
-                    value={openAiApiKey}
-                    onChange={(e) => setOpenAiApiKey(e.target.value)}
-                    placeholder="sk-... — leave blank if the server has OPENAI_API_KEY set"
-                    style={{ marginTop: '0.5rem' }}
-                  />
-                  <small style={{ display: 'block', marginTop: '0.25rem', color: '#666', fontSize: '0.875rem' }}>
-                    Used only in this browser session unless your teacher configured a server key.
-                  </small>
-                </label>
-              </div>
-
               <div
                 style={{
                   background: '#ffffff',
@@ -2165,7 +2124,7 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
       ? 'Pre-test: AI prompt knowledge'
       : 'Post-test: AI prompt knowledge';
     const intro = isPre
-      ? "Before you start, we'd like to measure what you already know about using AI for learning. This takes about 8-10 minutes. There are no right or wrong answers that affect your grade; we only use this data for the study."
+      ? "Before you start, we'd like to measure what you already know about using AI for learning. This takes about 8-10 minutes. There are no right or wrong answers; we only use this data for the study."
       : "Now that the activity is done, please answer the same kinds of questions one more time. This helps us measure what, if anything, changed. Answer honestly based on what you now think.";
 
     const allTfAnswered = TF_ITEMS.every(
@@ -2240,7 +2199,7 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
             </div>
           ))}
 
-          <h3 style={{ marginTop: '1.5rem' }}>Part 3 — Hallucination check (3 items)</h3>
+          <h3 style={{ marginTop: '1.5rem' }}>Part 3 — Factuality check (3 items)</h3>
           <p style={{ fontSize: '0.9rem', color: '#555' }}>
             For each item, an AI has produced a short study note. Each one contains at least one factual error. For each item: (a) describe the factual error you see, and (b) write the single verification prompt you would send back to the AI to correct it.
           </p>
@@ -2386,7 +2345,6 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             prompt: trimmed,
-            apiKey: openAiApiKey.trim() || undefined,
           }),
         });
         const data = (await res.json()) as { response?: string; error?: string };
@@ -2401,7 +2359,6 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               prompt: trimmed,
-              apiKey: openAiApiKey.trim() || undefined,
             }),
           });
           const data = (await res.json()) as { response?: string; error?: string };
@@ -2418,7 +2375,6 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
         body: JSON.stringify({
           prompt: trimmed,
           scenarioId: scenario.id,
-          apiKey: openAiApiKey.trim() || undefined,
         }),
       });
       const gradeData = (await gradeRes.json()) as {
@@ -2522,21 +2478,6 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
 
           <div style={{ background: '#E6F2EC', borderLeft: '4px solid #006B3F', padding: '0.75rem 1rem', borderRadius: '8px', marginBottom: '1rem' }}>
             <strong>Your goal:</strong> {scenario.studentGoal}
-          </div>
-
-          <div className="form-group" style={{ background: '#FFF8E1', borderLeftColor: '#D4A843' }}>
-            <label>
-              <strong>OpenAI API key (optional)</strong>
-              <input
-                type="password"
-                value={openAiApiKey}
-                onChange={(e) => setOpenAiApiKey(e.target.value)}
-                placeholder="sk-..."
-              />
-              <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.25rem' }}>
-                Leave blank if your teacher has configured this on the server.
-              </p>
-            </label>
           </div>
 
           {scenario.id === 's3_verification' ? (
@@ -2812,10 +2753,6 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
             )}
             {saveStatus === 'idle' && <span>Preparing save…</span>}
           </div>
-          
-          <p style={{ marginTop: '2rem', color: '#666', fontSize: '0.9rem' }}>
-            If you'd like a copy of your data for personal reference, open your browser's developer console and inspect the state variables.
-          </p>
           
           <div style={{ marginTop: '2rem', padding: '1.5rem', background: '#E6F2EC', borderRadius: '10px', borderLeft: '4px solid #006B3F', textAlign: 'center' }}>
             <p style={{ margin: 0, fontWeight: '500' }}>Your participation helps advance educational research on AI literacy. Thank you!</p>

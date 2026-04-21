@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt, apiKey } = await request.json();
+    const { prompt } = await request.json();
 
     if (!prompt) {
       return NextResponse.json(
@@ -11,13 +11,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use environment variable if available, otherwise use the provided apiKey
-    const openaiApiKey = process.env.OPENAI_API_KEY || apiKey;
+    const openaiApiKey = process.env.OPENAI_API_KEY;
 
     if (!openaiApiKey) {
       return NextResponse.json(
-        { error: 'OpenAI API key is required' },
-        { status: 400 }
+        { error: 'OPENAI_API_KEY is not configured on the server.' },
+        { status: 503 }
       );
     }
 

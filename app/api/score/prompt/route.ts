@@ -11,7 +11,7 @@ import {
 /**
  * Xiao-style LLM-as-judge auto-grader.
  *
- * POST { prompt: string, scenarioId: ScenarioId, apiKey?: string }
+ * POST { prompt: string, scenarioId: ScenarioId }
  *
  * Returns {
  *   model: string,
@@ -29,7 +29,6 @@ type VerdictMap = Partial<Record<RubricDimensionId, Verdict>>;
 type Body = {
   prompt?: unknown;
   scenarioId?: unknown;
-  apiKey?: unknown;
 };
 
 const VALID_SCENARIO_IDS = MODULE_SCENARIOS.map((s) => s.id) as readonly ScenarioId[];
@@ -203,7 +202,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { prompt, scenarioId, apiKey } = body;
+  const { prompt, scenarioId } = body;
   if (typeof prompt !== 'string' || !prompt.trim()) {
     return NextResponse.json({ error: 'prompt is required' }, { status: 400 });
   }
@@ -211,10 +210,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'scenarioId is invalid' }, { status: 400 });
   }
 
-  const openaiApiKey =
-    process.env.OPENAI_API_KEY || (typeof apiKey === 'string' ? apiKey : undefined);
+  const openaiApiKey = process.env.OPENAI_API_KEY;
   if (!openaiApiKey) {
-    return NextResponse.json({ error: 'OpenAI API key is required' }, { status: 400 });
+    return NextResponse.json({ error: 'OPENAI_API_KEY is not configured on the server.' }, { status: 503 });
   }
 
   const model = process.env.OPENAI_GRADER_MODEL || process.env.OPENAI_MODEL || 'gpt-4o';
