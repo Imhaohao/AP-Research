@@ -212,17 +212,17 @@ export async function POST(request: NextRequest) {
   if (inPersonInterest === 'yes') {
     if (inPersonDates.length === 0) {
       return NextResponse.json(
-        { error: 'Select at least one PRIME or Study Hall slot in the next two weeks.' },
+        { error: 'Select at least one PRIME or Study Hall slot for this week.' },
         { status: 400 }
       );
     }
     const hasPrime = inPersonDates.some((d) => {
       const day = new Date(d).getDay();
-      return day === 3;
+      return day === 5;
     });
     const hasStudyHall = inPersonDates.some((d) => {
       const day = new Date(d).getDay();
-      return day === 5;
+      return day === 3;
     });
     availabilityLabel = hasPrime && hasStudyHall
       ? 'prime_and_study_hall'

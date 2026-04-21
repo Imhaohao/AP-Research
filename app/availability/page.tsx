@@ -33,22 +33,37 @@ function getNextTwoWeeks(): Date[] {
   return days;
 }
 
-function getInPersonSlots(days: Date[]): InPersonSlot[] {
-  return days
-    .filter((d) => d.getDay() === 3 || d.getDay() === 5)
-    .map((d) => {
-      const type: InPersonSlot['type'] = d.getDay() === 3 ? 'prime' : 'study_hall';
-      return {
-        date: toYmd(d),
-        label: `${formatDateLabel(d)} (${type === 'prime' ? 'PRIME' : 'Study Hall'})`,
-        type,
-      };
-    });
+function getCurrentWeekInPersonSlots(): InPersonSlot[] {
+  const base = new Date();
+  base.setHours(0, 0, 0, 0);
+  const dayOfWeek = base.getDay(); // Sun=0, Mon=1, ...
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(base);
+  monday.setDate(base.getDate() + mondayOffset);
+
+  const wednesday = new Date(monday);
+  wednesday.setDate(monday.getDate() + 2);
+
+  const friday = new Date(monday);
+  friday.setDate(monday.getDate() + 4);
+
+  return [
+    {
+      date: toYmd(wednesday),
+      label: `${formatDateLabel(wednesday)} (Study Hall)`,
+      type: 'study_hall',
+    },
+    {
+      date: toYmd(friday),
+      label: `${formatDateLabel(friday)} (PRIME)`,
+      type: 'prime',
+    },
+  ];
 }
 
 export default function AvailabilityPage() {
   const nextTwoWeeks = useMemo(() => getNextTwoWeeks(), []);
-  const inPersonSlots = useMemo(() => getInPersonSlots(nextTwoWeeks), [nextTwoWeeks]);
+  const inPersonSlots = useMemo(() => getCurrentWeekInPersonSlots(), []);
   const [accessCode, setAccessCode] = useState('');
   const [inPersonInterest, setInPersonInterest] = useState<'' | 'yes' | 'no'>('');
   const [inPersonDates, setInPersonDates] = useState<string[]>([]);
@@ -152,9 +167,9 @@ export default function AvailabilityPage() {
 
         {inPersonInterest === 'yes' ? (
           <section className="signup-section">
-            <h2>Select PRIME / Study Hall slots (next 2 weeks)</h2>
+            <h2>Select this week&apos;s PRIME / Study Hall slots</h2>
             <p>
-              Study Hall is Friday, PRIME is Wednesday. For PRIME, sign up for HB prime (Samuel
+              Study Hall is Wednesday, PRIME is Friday. For PRIME, sign up for HB prime (Samuel
               Howles-Banerji). Choose all that you can attend in-person.
             </p>
             <div className="availability-chip-grid">
