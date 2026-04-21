@@ -158,3 +158,36 @@ export function usesLegacyTwoArmDesign(): boolean {
     process.env.NEXT_PUBLIC_LEGACY_TREATMENT_MODULE === '1'
   );
 }
+
+/**
+ * 2-arm experimental design used by the interactive Xiao-style module study.
+ *
+ * The database still records 3 arms (0/1/2) via the sequence-based assignment
+ * logic in Supabase — we do NOT change the database to keep historical data
+ * analyzable. For the new study, arm 0 is control and arms 1 & 2 are both
+ * treatment. Analysis code should collapse arms 1 and 2 accordingly.
+ */
+export type TwoArmCondition = 'control' | 'treatment';
+
+export function twoArmConditionFromArm(arm: TreatmentArm | null | undefined): TwoArmCondition {
+  if (arm === 0) return 'control';
+  if (arm === 1 || arm === 2) return 'treatment';
+  // Fallback — if assignment has not loaded or legacy flow, default to control
+  // which shows the non-instructional content.
+  return 'control';
+}
+
+export const TWO_ARM_LABELS: Record<TwoArmCondition, { title: string; short: string; description: string }> = {
+  control: {
+    title: 'Control — non-instructional reading',
+    short: 'Control',
+    description:
+      "You'll spend a few minutes on a short digital-literacy reading before the main writing task. No prompt-engineering instruction in this arm.",
+  },
+  treatment: {
+    title: 'Treatment — interactive prompt-engineering module',
+    short: 'Treatment',
+    description:
+      "You'll complete an interactive 3-scenario module that teaches ethical AI use, prompt iteration, and verifying AI claims, before the main writing task.",
+  },
+};

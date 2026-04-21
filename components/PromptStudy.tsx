@@ -13,10 +13,28 @@ import {
   craftAiNarrativeChatSystemPrompt,
   craftRevisionCoachPrompt,
   NARRATIVE_PROMPT_BANK,
+  TWO_ARM_LABELS,
+  twoArmConditionFromArm,
   usesLegacyTwoArmDesign,
   type StudyGroupSlug,
   type TreatmentArm,
+  type TwoArmCondition,
 } from '@/lib/studyArms';
+import {
+  MODULE_SCENARIOS,
+  RUBRIC_DIMENSIONS,
+  gradeDetection,
+  getScenario,
+  type ModuleScenario,
+  type RubricDimensionId,
+  type ScenarioId,
+} from '@/lib/moduleScenarios';
+import {
+  HALLUCINATION_ITEMS,
+  LIKERT_CONFIDENCE_ITEMS,
+  OE_ITEMS,
+  TF_ITEMS,
+} from '@/lib/moduleAssessment';
 
 function formatOpenAiHelperError(message: string): string {
   const m = (message || '').trim();
@@ -43,9 +61,12 @@ export default function PromptStudy({
   type Stage =
     | "consent"
     | "preSurvey"
+    | "preAssess"
     | "module"
+    | "modulePractice"
     | "task"
     | "postSurvey"
+    | "postAssess"
     | "complete"
     | "craftIntro"
     | "craftHuman"
@@ -78,6 +99,16 @@ export default function PromptStudy({
 
   /** Coaching / generation style: legacy study uses guided-style (arm 1); RCT uses assigned arm */
   const coachArm: TreatmentArm = legacyTwoArm ? 1 : (treatmentArm ?? 1);
+
+  /**
+   * 2-arm condition used by the Xiao-style module study. The database still
+   * records 3 arms (0/1/2) via the sequence-based assignment logic — we
+   * collapse arm 0 -> control and arms 1,2 -> treatment in the UI and for
+   * analysis. Legacy two-arm participants use their randomized legacyGroup.
+   */
+  const twoArmCondition: TwoArmCondition = legacyTwoArm
+    ? legacyGroup
+    : twoArmConditionFromArm(treatmentArm);
 
   useEffect(() => {
     if (legacyTwoArm) return;
@@ -139,6 +170,80 @@ export default function PromptStudy({
     open2: "",
     open3: "",
   });
+
+  /** ----- Pre/Post assessment state (Xiao Study 2-style: TF + OE + Likert + hallucination subtest) ----- */
+  type TFAnswerMap = Record<string, boolean | null>;
+  type OEAnswerMap = Record<string, string>;
+  type HalucItemAnswers = { flaggedError: string; correctionPrompt: string };
+  type HallucinationAnswerMap = Record<string, HalucItemAnswers>;
+  type LikertAnswerMap = Record<'q1' | 'q2' | 'q3' | 'q4' | 'q5', number>;
+
+  function freshLikert(): LikertAnswerMap {
+    return { q1: 0, q2: 0, q3: 0, q4: 0, q5: 0 };
+  }
+  function freshTF(): TFAnswerMap {
+    return Object.fromEntries(TF_ITEMS.map((i) => [i.id, null])) as TFAnswerMap;
+  }
+  function freshOE(): OEAnswerMap {
+    return Object.fromEntries(OE_ITEMS.map((i) => [i.id, ""])) as OEAnswerMap;
+  }
+  function freshHallucination(): HallucinationAnswerMap {
+    return Object.fromEntries(
+      HALLUCINATION_ITEMS.map((i) => [i.id, { flaggedError: "", correctionPrompt: "" }])
+    ) as HallucinationAnswerMap;
+  }
+
+  const [preAssessment, setPreAssessment] = useState<{
+    tf: TFAnswerMap;
+    oe: OEAnswerMap;
+    hallucination: HallucinationAnswerMap;
+    likert: LikertAnswerMap;
+  }>(() => ({ tf: freshTF(), oe: freshOE(), hallucination: freshHallucination(), likert: freshLikert() }));
+
+  const [postAssessment, setPostAssessment] = useState<{
+    tf: TFAnswerMap;
+    oe: OEAnswerMap;
+    hallucination: HallucinationAnswerMap;
+    likert: LikertAnswerMap;
+  }>(() => ({ tf: freshTF(), oe: freshOE(), hallucination: freshHallucination(), likert: freshLikert() }));
+
+  /** ----- Interactive module (3 scenarios) state ----- */
+  type ModuleAttempt = {
+    prompt: string;
+    aiResponse: string;
+    autoGrade: Record<RubricDimensionId, { pass: boolean; explanation: string }> | null;
+    gradingStatus: 'pending' | 'graded' | 'error';
+    gradingError?: string;
+    msElapsed: number;
+    submittedAt: string;
+  };
+  type ModuleScenarioState = {
+    id: ScenarioId;
+    attempts: ModuleAttempt[];
+    completed: boolean;
+    detection?: {
+      flaggedErrors: string;
+      correctionPrompt: string;
+      detectedErrorIds: string[]; // auto-graded via keyword match
+    };
+  };
+
+  function makeFreshModuleState(): Record<ScenarioId, ModuleScenarioState> {
+    return Object.fromEntries(
+      MODULE_SCENARIOS.map((s) => [s.id, { id: s.id, attempts: [], completed: false } as ModuleScenarioState])
+    ) as unknown as Record<ScenarioId, ModuleScenarioState>;
+  }
+
+  const [moduleScenarioIdx, setModuleScenarioIdx] = useState(0);
+  const [moduleState, setModuleState] = useState<Record<ScenarioId, ModuleScenarioState>>(
+    () => makeFreshModuleState()
+  );
+  const [modulePromptDraft, setModulePromptDraft] = useState('');
+  const [moduleFlaggedDraft, setModuleFlaggedDraft] = useState(''); // S3 only
+  const [moduleCorrectionDraft, setModuleCorrectionDraft] = useState(''); // S3 only
+  const [moduleBusy, setModuleBusy] = useState(false);
+  const [moduleError, setModuleError] = useState('');
+  const moduleScenarioStartRef = useRef<number>(Date.now());
   const topics = [
     "Why do neutron stars 'glitch'?",
     "How do slime molds solve mazes?",
@@ -192,6 +297,14 @@ export default function PromptStudy({
       setOpenAiError('');
     }
   }, [stage]);
+
+  /** Reset the scenario-start timer whenever the module practice stage begins
+   *  or the scenario index changes. Timings reflect time-on-scenario. */
+  useEffect(() => {
+    if (stage === 'modulePractice') {
+      moduleScenarioStartRef.current = Date.now();
+    }
+  }, [stage, moduleScenarioIdx]);
 
   const [craftData, setCraftData] = useState({
     icebreakerPriorKnowledge: '',
@@ -272,11 +385,69 @@ export default function PromptStudy({
   const flushSubmission = useCallback(async () => {
     setSaveStatus('saving');
     setSaveMessage('');
+
+    /** Serialized `module` blob for analysis (see research plan data schema). */
+    const moduleBlob = {
+      two_arm_condition: twoArmCondition,
+      scenarios: MODULE_SCENARIOS.map((s) => {
+        const st = moduleState[s.id];
+        return {
+          id: s.id,
+          pillar: s.pillar,
+          applicable_dimensions: s.applicableDimensions,
+          attempts: (st?.attempts ?? []).map((a) => ({
+            prompt: a.prompt,
+            ai_response: a.aiResponse,
+            auto_grade: a.autoGrade,
+            grading_status: a.gradingStatus,
+            grading_error: a.gradingError ?? null,
+            ms_elapsed: a.msElapsed,
+            submitted_at: a.submittedAt,
+          })),
+          detection: st?.detection
+            ? {
+                flagged_errors: st.detection.flaggedErrors,
+                correction_prompt: st.detection.correctionPrompt,
+                detected_error_ids: st.detection.detectedErrorIds,
+                planted_error_ids: (s.plantedErrors ?? []).map((e) => e.id),
+              }
+            : null,
+          completed: Boolean(st?.completed),
+        };
+      }),
+    };
+
+    function serializeAssessment(a: typeof preAssessment) {
+      return {
+        tf: TF_ITEMS.map((item) => ({
+          id: item.id,
+          pillar: item.pillar,
+          correct_answer: item.correctAnswer,
+          response: a.tf[item.id] ?? null,
+        })),
+        oe: OE_ITEMS.map((item) => ({ id: item.id, response: a.oe[item.id] ?? '' })),
+        hallucination_items: HALLUCINATION_ITEMS.map((item) => ({
+          id: item.id,
+          topic: item.topic,
+          ai_response: item.aiResponse,
+          planted_error_description: item.plantedErrorDescription,
+          flagged_error: a.hallucination[item.id]?.flaggedError ?? '',
+          correction_prompt: a.hallucination[item.id]?.correctionPrompt ?? '',
+        })),
+        likert: a.likert,
+      };
+    }
+
     const data: Record<string, unknown> = {
       participant_email: participantEmail ?? null,
       participant_login_id: participantLoginId ?? null,
       consent,
+      two_arm_condition: twoArmCondition,
+      pre_responses: preResponses,
       post_responses: postResponses,
+      pre_assessment: serializeAssessment(preAssessment),
+      post_assessment: serializeAssessment(postAssessment),
+      module: moduleBlob,
       craft_curriculum: useCraftPath ? craftData : null,
       task_data: taskData,
       practice_prompt: practicePrompt,
@@ -319,9 +490,13 @@ export default function PromptStudy({
     legacyTwoArm,
     treatmentArm,
     participantSequence,
+    twoArmCondition,
     consent,
     preResponses,
     postResponses,
+    preAssessment,
+    postAssessment,
+    moduleState,
     taskData,
     practicePrompt,
     practiceTries,
@@ -346,9 +521,32 @@ export default function PromptStudy({
     return () => clearTimeout(t);
   }, [stage, flushSubmission]);
 
-  const flowStages: Stage[] = useCraftPath
-    ? [
+  /**
+   * Modern (non-legacy) flow: 2-arm design routed via `twoArmCondition`.
+   *   Control  : consent -> preAssess -> module (reading) -> craft... -> postAssess
+   *   Treatment: consent -> preAssess -> modulePractice (3 scenarios) -> craft... -> postAssess
+   * The CRAFT writing task runs for BOTH arms as the shared behavioral arena.
+   *
+   * Legacy flow: unchanged from the original implementation.
+   */
+  const flowStages: Stage[] = legacyTwoArm
+    ? useCraftPath
+      ? [
+          'consent',
+          'craftIntro',
+          'craftHuman',
+          'craftAI',
+          'craftCompare',
+          'craftRevise',
+          'craftReflect',
+          'craftExit',
+          'complete',
+        ]
+      : ['consent', 'module', 'task', 'postSurvey', 'complete']
+    : [
         'consent',
+        'preAssess',
+        twoArmCondition === 'treatment' ? 'modulePractice' : 'module',
         'craftIntro',
         'craftHuman',
         'craftAI',
@@ -356,14 +554,16 @@ export default function PromptStudy({
         'craftRevise',
         'craftReflect',
         'craftExit',
+        'postAssess',
         'complete',
-      ]
-    : ['consent', 'module', 'task', 'postSurvey', 'complete'];
+      ];
 
   const stageShortLabel: Record<Stage, string> = {
     consent: 'Consent',
     preSurvey: 'Pre',
-    module: 'Module',
+    preAssess: 'Pre-test',
+    module: 'Reading',
+    modulePractice: 'Practice',
     task: 'Task',
     craftIntro: 'Intro',
     craftHuman: 'You write',
@@ -373,6 +573,7 @@ export default function PromptStudy({
     craftReflect: 'Discuss',
     craftExit: 'Exit',
     postSurvey: 'Post',
+    postAssess: 'Post-test',
     complete: 'Done',
   };
 
@@ -425,20 +626,36 @@ export default function PromptStudy({
           
           <h3>What to Expect</h3>
           <ul>
-            <li>Complete a brief pre-survey about your AI experience</li>
-            {useCraftPath ? (
+            {legacyTwoArm ? (
               <>
-                <li>Self-paced introduction and narrative drafting (your story, then an AI-generated story from the same prompt)</li>
-                <li>Compare voice, structure, and strengths; revise with AI; reflect as you would in a class discussion</li>
-                <li>Exit ticket and commitment statement, then a short post-survey</li>
-                <li>Total time: about 55–65 minutes (similar to a 60-minute CRAFT-style block, done on your own)</li>
+                <li>Complete a brief pre-survey about your AI experience</li>
+                {useCraftPath ? (
+                  <>
+                    <li>Self-paced introduction and narrative drafting (your story, then an AI-generated story from the same prompt)</li>
+                    <li>Compare voice, structure, and strengths; revise with AI; reflect as you would in a class discussion</li>
+                    <li>Exit ticket and commitment statement, then a short post-survey</li>
+                    <li>Total time: about 55–65 minutes</li>
+                  </>
+                ) : (
+                  <>
+                    <li>Review a short educational module (5 minutes)</li>
+                    <li>Write a brief explanation on an unfamiliar topic</li>
+                    <li>Complete a post-survey about your experience</li>
+                    <li>Total time: approximately 45-60 minutes</li>
+                  </>
+                )}
               </>
             ) : (
               <>
-                <li>Review a short educational module (5 minutes)</li>
-                <li>Write a brief explanation on an unfamiliar topic</li>
-                <li>Complete a post-survey about your experience</li>
-                <li>Total time: approximately 45-60 minutes</li>
+                <li>Short pre-test: True/False questions, two short written prompts, a 3-question hallucination check, and 5 confidence ratings</li>
+                {twoArmCondition === 'treatment' ? (
+                  <li>Interactive 3-scenario prompt-engineering practice (ethical use, iterating on a weak AI reply, fact-checking AI output)</li>
+                ) : (
+                  <li>Short reading on digital literacy (similar time commitment)</li>
+                )}
+                <li>Narrative writing task with an AI assistant (your draft, an AI draft, compare, revise, reflect, exit ticket)</li>
+                <li>Short post-test matching the pre-test structure</li>
+                <li>Total time: about 55–70 minutes</li>
               </>
             )}
           </ul>
@@ -461,10 +678,10 @@ export default function PromptStudy({
               {assignStatus === 'ready' && treatmentArm !== null && (
                 <>
                   <p style={{ marginBottom: '0.35rem' }}>
-                    <strong>{ARM_LABELS[treatmentArm].title}</strong>
+                    <strong>{TWO_ARM_LABELS[twoArmCondition].title}</strong>
                   </p>
                   <p style={{ marginBottom: '0.35rem', fontSize: '0.95rem' }}>
-                    {ARM_LABELS[treatmentArm].description}
+                    {TWO_ARM_LABELS[twoArmCondition].description}
                   </p>
                   {participantSequence !== null ? (
                     <p style={{ marginBottom: 0, fontSize: '0.85rem', color: '#555' }}>
@@ -495,7 +712,13 @@ export default function PromptStudy({
 
           <button
             disabled={!consent || (!legacyTwoArm && assignStatus !== 'ready')}
-            onClick={() => setStage(useCraftPath ? 'craftIntro' : 'module')}
+            onClick={() => {
+              if (legacyTwoArm) {
+                setStage(useCraftPath ? 'craftIntro' : 'module');
+              } else {
+                setStage('preAssess');
+              }
+            }}
             style={{ marginTop: '1rem' }}
           >
             Begin Study
@@ -615,12 +838,20 @@ export default function PromptStudy({
   }
 
   function renderModule() {
+    /**
+     * In modern (non-legacy) mode, this stage is ONLY reached by the control
+     * arm — treatment arm participants go to modulePractice instead. We show
+     * the digital-literacy reading for them.
+     * In legacy mode, the treatment branch below (Prompt Engineering
+     * Mini-Course) is still reachable when legacyGroup === 'treatment'.
+     */
+    const showTreatmentMiniCourse = legacyTwoArm && legacyGroup === 'treatment';
     return (
       <div className="lms-container">
         {renderProgressBar()}
         <div className="lms-card">
-          <h2>{legacyGroup === "treatment" ? "Prompt Engineering Mini‑Course" : "Digital Literacy Module"}</h2>
-          {legacyGroup === "treatment" ? (
+          <h2>{showTreatmentMiniCourse ? "Prompt Engineering Mini‑Course" : "Digital Literacy Module"}</h2>
+          {showTreatmentMiniCourse ? (
             <>
               <p style={{ fontSize: '1.1rem', fontWeight: '500', marginBottom: '1.5rem' }}>
                 Welcome! This module introduces prompt engineering: the art and science of crafting effective prompts to get better results from AI tools.
@@ -835,8 +1066,11 @@ export default function PromptStudy({
           )}
           
           {!showPractice && (
-            <button onClick={() => setStage("task")} style={{ marginTop: '1.5rem' }}>
-              Start Writing Task →
+            <button
+              onClick={() => setStage(legacyTwoArm ? 'task' : 'craftIntro')}
+              style={{ marginTop: '1.5rem' }}
+            >
+              {legacyTwoArm ? 'Start Writing Task →' : 'Start Narrative Writing Task →'}
             </button>
           )}
         </div>
@@ -1611,11 +1845,11 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
 
         <button
           type="button"
-          onClick={() => setStage('complete')}
+          onClick={() => setStage(legacyTwoArm ? 'complete' : 'postAssess')}
           disabled={lotteryOptIn && !participantNumber.trim()}
           style={{ marginTop: '1rem' }}
         >
-          Submit study →
+          {legacyTwoArm ? 'Submit study →' : 'Continue to post-test →'}
         </button>
       </>,
       'Exit ticket & commitment',
@@ -1919,6 +2153,549 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
     );
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Modern-flow renderers: pre/post assessment + interactive module     */
+  /* ------------------------------------------------------------------ */
+
+  function renderAssessment(phase: 'pre' | 'post') {
+    const isPre = phase === 'pre';
+    const a = isPre ? preAssessment : postAssessment;
+    const setA = isPre ? setPreAssessment : setPostAssessment;
+    const heading = isPre
+      ? 'Pre-test: AI prompt knowledge'
+      : 'Post-test: AI prompt knowledge';
+    const intro = isPre
+      ? "Before you start, we'd like to measure what you already know about using AI for learning. This takes about 8-10 minutes. There are no right or wrong answers that affect your grade; we only use this data for the study."
+      : "Now that the activity is done, please answer the same kinds of questions one more time. This helps us measure what, if anything, changed. Answer honestly based on what you now think.";
+
+    const allTfAnswered = TF_ITEMS.every(
+      (it) => a.tf[it.id] === true || a.tf[it.id] === false
+    );
+    const allLikertAnswered = LIKERT_CONFIDENCE_ITEMS.every(
+      (it) => (a.likert[it.id] ?? 0) > 0
+    );
+    const canAdvance = allTfAnswered && allLikertAnswered;
+
+    return (
+      <div className="lms-container">
+        {renderProgressBar()}
+        <div className="lms-card">
+          <h2>{heading}</h2>
+          <p>{intro}</p>
+
+          <h3 style={{ marginTop: '1.5rem' }}>Part 1 — True/False</h3>
+          <p style={{ fontSize: '0.9rem', color: '#555' }}>
+            Decide whether each statement is True or False based on what you believe is the best way to use AI for schoolwork.
+          </p>
+          {TF_ITEMS.map((item) => (
+            <div className="form-group" key={`${phase}-${item.id}`} style={{ marginBottom: '1rem' }}>
+              <p style={{ marginBottom: '0.5rem' }}>
+                <strong>{item.statement}</strong>
+              </p>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                {[true, false].map((val) => (
+                  <label
+                    key={String(val)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem',
+                      padding: '0.25rem 0.75rem',
+                      border: '1px solid #d0d0d0',
+                      borderRadius: '6px',
+                      background: a.tf[item.id] === val ? '#E6F2EC' : '#fff',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name={`${phase}-${item.id}`}
+                      checked={a.tf[item.id] === val}
+                      onChange={() =>
+                        setA({ ...a, tf: { ...a.tf, [item.id]: val } })
+                      }
+                    />
+                    {val ? 'True' : 'False'}
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          <h3 style={{ marginTop: '1.5rem' }}>Part 2 — Short written responses</h3>
+          {OE_ITEMS.map((item) => (
+            <div className="form-group" key={`${phase}-${item.id}`}>
+              <label>
+                <strong>{item.label}</strong>
+                <p style={{ whiteSpace: 'pre-wrap', margin: '0.4rem 0 0.6rem 0', fontSize: '0.95rem', color: '#333' }}>
+                  {item.instructions}
+                </p>
+                <textarea
+                  value={a.oe[item.id] ?? ''}
+                  onChange={(e) => setA({ ...a, oe: { ...a.oe, [item.id]: e.target.value } })}
+                  rows={5}
+                  placeholder="Type your response here..."
+                />
+              </label>
+            </div>
+          ))}
+
+          <h3 style={{ marginTop: '1.5rem' }}>Part 3 — Hallucination check (3 items)</h3>
+          <p style={{ fontSize: '0.9rem', color: '#555' }}>
+            For each item, an AI has produced a short study note. Each one contains at least one factual error. For each item: (a) describe the factual error you see, and (b) write the single verification prompt you would send back to the AI to correct it.
+          </p>
+          {HALLUCINATION_ITEMS.map((item, idx) => (
+            <div
+              key={`${phase}-${item.id}`}
+              className="form-group"
+              style={{ background: '#FDF6E3', borderLeftColor: '#D4A843' }}
+            >
+              <p style={{ marginTop: 0, marginBottom: '0.4rem', fontWeight: 600 }}>
+                Item {idx + 1} — {item.topic}
+              </p>
+              <div
+                style={{
+                  background: '#fff',
+                  border: '1px solid #e0d6b6',
+                  padding: '0.75rem',
+                  borderRadius: '6px',
+                  marginBottom: '0.75rem',
+                  whiteSpace: 'pre-wrap',
+                }}
+              >
+                {item.aiResponse}
+              </div>
+              <label>
+                <strong>Factual error(s) you see</strong>
+                <textarea
+                  rows={3}
+                  placeholder="Describe what is wrong and what the correct information should be."
+                  value={a.hallucination[item.id]?.flaggedError ?? ''}
+                  onChange={(e) =>
+                    setA({
+                      ...a,
+                      hallucination: {
+                        ...a.hallucination,
+                        [item.id]: {
+                          flaggedError: e.target.value,
+                          correctionPrompt: a.hallucination[item.id]?.correctionPrompt ?? '',
+                        },
+                      },
+                    })
+                  }
+                />
+              </label>
+              <label style={{ marginTop: '0.5rem', display: 'block' }}>
+                <strong>Your verification prompt</strong>
+                <textarea
+                  rows={3}
+                  placeholder="Write the single prompt you would send back to the AI to verify and correct its claims."
+                  value={a.hallucination[item.id]?.correctionPrompt ?? ''}
+                  onChange={(e) =>
+                    setA({
+                      ...a,
+                      hallucination: {
+                        ...a.hallucination,
+                        [item.id]: {
+                          flaggedError: a.hallucination[item.id]?.flaggedError ?? '',
+                          correctionPrompt: e.target.value,
+                        },
+                      },
+                    })
+                  }
+                />
+              </label>
+            </div>
+          ))}
+
+          <h3 style={{ marginTop: '1.5rem' }}>Part 4 — Confidence ratings</h3>
+          <p style={{ fontSize: '0.9rem', color: '#555' }}>
+            1 = Strongly Disagree, 5 = Strongly Agree.
+          </p>
+          {LIKERT_CONFIDENCE_ITEMS.map((item) => (
+            <div className="form-group" key={`${phase}-${item.id}`}>
+              <label>
+                <strong>{item.prompt}</strong>
+                {renderLikert(
+                  a.likert[item.id] ?? 0,
+                  (v) => setA({ ...a, likert: { ...a.likert, [item.id]: v } }),
+                  `${phase}-${item.id}`
+                )}
+              </label>
+            </div>
+          ))}
+
+          {!canAdvance ? (
+            <p style={{ fontSize: '0.85rem', color: '#8B7230' }}>
+              Please answer every True/False item and every confidence rating before continuing.
+            </p>
+          ) : null}
+
+          <button
+            disabled={!canAdvance}
+            onClick={() => {
+              if (isPre) {
+                setStage(twoArmCondition === 'treatment' ? 'modulePractice' : 'module');
+              } else {
+                setStage('complete');
+              }
+            }}
+          >
+            {isPre
+              ? twoArmCondition === 'treatment'
+                ? 'Continue to interactive module →'
+                : 'Continue to reading →'
+              : 'Submit study →'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  /**
+   * Interactive 3-scenario module (treatment arm only).
+   * Implements the Xiao et al. (2025) 4-step pipeline per scenario:
+   *   (1) scenario intro + goal
+   *   (2) student writes a prompt (and for S3, flags errors + correction prompt)
+   *   (3) AI response (live, prescripted-first, or fully prescripted)
+   *   (4) auto-grade per rubric dimension + elaborated feedback
+   * Students may re-attempt; advance is gated by `minAttemptsBeforeAdvance`.
+   */
+  async function handleSubmitModuleAttempt() {
+    const scenario = MODULE_SCENARIOS[moduleScenarioIdx];
+    if (!scenario) return;
+    const trimmed = modulePromptDraft.trim();
+    if (!trimmed) {
+      setModuleError('Please write a prompt before submitting.');
+      return;
+    }
+    setModuleError('');
+    setModuleBusy(true);
+
+    const startedAt = moduleScenarioStartRef.current;
+    const submittedAt = new Date().toISOString();
+    const msElapsed = Date.now() - startedAt;
+
+    try {
+      let aiResponse = '';
+      const priorAttempts = moduleState[scenario.id]?.attempts ?? [];
+
+      if (scenario.aiResponseMode === 'live') {
+        const res = await fetch('/api/llm/openai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: trimmed,
+            apiKey: openAiApiKey.trim() || undefined,
+          }),
+        });
+        const data = (await res.json()) as { response?: string; error?: string };
+        if (!res.ok) throw new Error(data.error || 'AI call failed');
+        aiResponse = data.response ?? '';
+      } else if (scenario.aiResponseMode === 'iteration_prescripted_first') {
+        if (priorAttempts.length === 0) {
+          aiResponse = scenario.firstAiResponse ?? '';
+        } else {
+          const res = await fetch('/api/llm/openai', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt: trimmed,
+              apiKey: openAiApiKey.trim() || undefined,
+            }),
+          });
+          const data = (await res.json()) as { response?: string; error?: string };
+          if (!res.ok) throw new Error(data.error || 'AI call failed');
+          aiResponse = data.response ?? '';
+        }
+      } else {
+        aiResponse = scenario.prescriptedAiResponse ?? '';
+      }
+
+      const gradeRes = await fetch('/api/score/prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: trimmed,
+          scenarioId: scenario.id,
+          apiKey: openAiApiKey.trim() || undefined,
+        }),
+      });
+      const gradeData = (await gradeRes.json()) as {
+        verdicts?: Record<
+          RubricDimensionId,
+          { pass: boolean; explanation: string }
+        >;
+        error?: string;
+      };
+
+      const attempt: ModuleAttempt = {
+        prompt: trimmed,
+        aiResponse,
+        autoGrade: gradeRes.ok && gradeData.verdicts ? gradeData.verdicts : null,
+        gradingStatus: gradeRes.ok && gradeData.verdicts ? 'graded' : 'error',
+        gradingError: gradeRes.ok ? undefined : gradeData.error || `Grader failed (${gradeRes.status})`,
+        msElapsed,
+        submittedAt,
+      };
+
+      let detection = moduleState[scenario.id]?.detection;
+      if (scenario.id === 's3_verification') {
+        const flaggedErrorsText = moduleFlaggedDraft.trim();
+        const correctionPrompt = moduleCorrectionDraft.trim();
+        const detectionResults = gradeDetection(
+          flaggedErrorsText,
+          scenario.plantedErrors ?? []
+        );
+        detection = {
+          flaggedErrors: flaggedErrorsText,
+          correctionPrompt,
+          detectedErrorIds: detectionResults.filter((r) => r.detected).map((r) => r.errorId),
+        };
+      }
+
+      setModuleState((prev) => ({
+        ...prev,
+        [scenario.id]: {
+          ...prev[scenario.id],
+          attempts: [...priorAttempts, attempt],
+          detection,
+        },
+      }));
+    } catch (e) {
+      setModuleError(e instanceof Error ? e.message : 'Something went wrong');
+    } finally {
+      setModuleBusy(false);
+    }
+  }
+
+  function advanceModule() {
+    const scenario = MODULE_SCENARIOS[moduleScenarioIdx];
+    if (!scenario) return;
+    setModuleState((prev) => ({
+      ...prev,
+      [scenario.id]: { ...prev[scenario.id], completed: true },
+    }));
+    if (moduleScenarioIdx < MODULE_SCENARIOS.length - 1) {
+      setModuleScenarioIdx(moduleScenarioIdx + 1);
+      setModulePromptDraft('');
+      setModuleFlaggedDraft('');
+      setModuleCorrectionDraft('');
+      setModuleError('');
+      moduleScenarioStartRef.current = Date.now();
+    } else {
+      setStage('craftIntro');
+    }
+  }
+
+  function renderModulePractice() {
+    const scenario = MODULE_SCENARIOS[moduleScenarioIdx];
+    if (!scenario) return null;
+    const st = moduleState[scenario.id];
+    const attempts = st?.attempts ?? [];
+    const latest = attempts[attempts.length - 1];
+    const attemptCount = attempts.length;
+    const canAdvance = attemptCount >= scenario.minAttemptsBeforeAdvance;
+
+    return (
+      <div className="lms-container">
+        {renderProgressBar()}
+        <div className="lms-card">
+          <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.3rem' }}>
+            Scenario {scenario.order} of {MODULE_SCENARIOS.length} · {scenario.navLabel}
+          </p>
+          <h2>{scenario.title}</h2>
+          <p style={{ fontStyle: 'italic', color: '#555' }}>{scenario.oneLiner}</p>
+
+          <div
+            style={{
+              background: '#F7F6F1',
+              border: '1px solid #E0DCCF',
+              borderRadius: '8px',
+              padding: '1rem',
+              margin: '1rem 0',
+              whiteSpace: 'pre-wrap',
+            }}
+          >
+            {scenario.context}
+          </div>
+
+          <div style={{ background: '#E6F2EC', borderLeft: '4px solid #006B3F', padding: '0.75rem 1rem', borderRadius: '8px', marginBottom: '1rem' }}>
+            <strong>Your goal:</strong> {scenario.studentGoal}
+          </div>
+
+          <div className="form-group" style={{ background: '#FFF8E1', borderLeftColor: '#D4A843' }}>
+            <label>
+              <strong>OpenAI API key (optional)</strong>
+              <input
+                type="password"
+                value={openAiApiKey}
+                onChange={(e) => setOpenAiApiKey(e.target.value)}
+                placeholder="sk-..."
+              />
+              <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.25rem' }}>
+                Leave blank if your teacher has configured this on the server.
+              </p>
+            </label>
+          </div>
+
+          {scenario.id === 's3_verification' ? (
+            <div className="form-group">
+              <label>
+                <strong>Flag the factual errors in the AI summary above</strong>
+                <p style={{ fontSize: '0.85rem', color: '#555', margin: '0.25rem 0 0.5rem 0' }}>
+                  {scenario.detectionInstructions}
+                </p>
+                <textarea
+                  rows={5}
+                  value={moduleFlaggedDraft}
+                  onChange={(e) => setModuleFlaggedDraft(e.target.value)}
+                  placeholder="Write one error per line. Be concrete."
+                />
+              </label>
+            </div>
+          ) : null}
+
+          <div className="form-group">
+            <label>
+              <strong>Your prompt (attempt {attemptCount + 1})</strong>
+              <p style={{ fontSize: '0.85rem', color: '#555', margin: '0.25rem 0 0.5rem 0' }}>
+                {scenario.promptInstructions}
+              </p>
+              <textarea
+                rows={6}
+                value={modulePromptDraft}
+                onChange={(e) => setModulePromptDraft(e.target.value)}
+                placeholder="Write the prompt you would send to the AI..."
+              />
+            </label>
+          </div>
+
+          {scenario.id === 's3_verification' ? (
+            <div className="form-group">
+              <label>
+                <strong>Note: for this scenario, treat the prompt above as your verification prompt.</strong>
+                <p style={{ fontSize: '0.85rem', color: '#555', margin: '0.25rem 0 0.5rem 0' }}>
+                  Your prompt will be auto-graded on the same rubric dimensions. Your error list (above) is graded separately against our ground truth.
+                </p>
+                <textarea
+                  rows={2}
+                  value={moduleCorrectionDraft}
+                  onChange={(e) => setModuleCorrectionDraft(e.target.value)}
+                  placeholder="(Optional) Any notes on why you wrote the prompt this way."
+                />
+              </label>
+            </div>
+          ) : null}
+
+          {moduleError ? (
+            <p style={{ color: '#c62828', marginTop: '0.5rem' }}>{moduleError}</p>
+          ) : null}
+
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+            <button
+              type="button"
+              disabled={moduleBusy || !modulePromptDraft.trim()}
+              onClick={() => void handleSubmitModuleAttempt()}
+            >
+              {moduleBusy ? 'Submitting…' : attemptCount === 0 ? 'Submit prompt →' : 'Submit revised prompt →'}
+            </button>
+            <button
+              type="button"
+              onClick={advanceModule}
+              disabled={!canAdvance || moduleBusy}
+              style={{ background: canAdvance ? '#006B3F' : '#a8c8b6' }}
+              title={
+                canAdvance
+                  ? 'Advance to the next scenario'
+                  : `You must make at least ${scenario.minAttemptsBeforeAdvance} attempt${scenario.minAttemptsBeforeAdvance === 1 ? '' : 's'} before advancing.`
+              }
+            >
+              {moduleScenarioIdx < MODULE_SCENARIOS.length - 1
+                ? 'Advance to next scenario →'
+                : 'Finish module & start writing task →'}
+            </button>
+          </div>
+
+          {latest ? (
+            <div
+              style={{
+                marginTop: '1.5rem',
+                padding: '1rem',
+                background: '#F6FAFF',
+                border: '1px solid #cfe0f5',
+                borderRadius: '8px',
+              }}
+            >
+              <h3 style={{ marginTop: 0 }}>AI response (attempt {attemptCount})</h3>
+              <div
+                style={{
+                  background: '#fff',
+                  border: '1px solid #dce6f2',
+                  padding: '0.75rem',
+                  borderRadius: '6px',
+                  whiteSpace: 'pre-wrap',
+                  marginBottom: '0.75rem',
+                }}
+              >
+                {latest.aiResponse || '(no response)'}
+              </div>
+
+              <h3 style={{ marginTop: '0.5rem' }}>Per-dimension feedback on your prompt</h3>
+              {latest.gradingStatus === 'error' ? (
+                <p style={{ color: '#c62828' }}>
+                  Grader error: {latest.gradingError || 'unknown'}. You can submit another attempt.
+                </p>
+              ) : latest.autoGrade ? (
+                <div style={{ display: 'grid', gap: '0.5rem' }}>
+                  {scenario.applicableDimensions.map((dimId) => {
+                    const dim = RUBRIC_DIMENSIONS.find((d) => d.id === dimId);
+                    const verdict = latest.autoGrade?.[dimId];
+                    if (!dim || !verdict) return null;
+                    const pass = verdict.pass;
+                    return (
+                      <div
+                        key={dimId}
+                        style={{
+                          background: pass ? '#E6F2EC' : '#FDECEC',
+                          border: `1px solid ${pass ? '#9ac4ae' : '#f0b4b4'}`,
+                          padding: '0.6rem 0.75rem',
+                          borderRadius: '6px',
+                        }}
+                      >
+                        <div style={{ fontWeight: 600 }}>
+                          {pass ? '✓' : '✗'} {dim.label}
+                        </div>
+                        <div style={{ fontSize: '0.9rem', color: '#333', marginTop: '0.2rem' }}>
+                          {verdict.explanation}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p>Grading…</p>
+              )}
+
+              {scenario.id === 's3_verification' && st?.detection ? (
+                <div style={{ marginTop: '0.75rem' }}>
+                  <h3>Error-detection results</h3>
+                  <p style={{ fontSize: '0.9rem', color: '#555' }}>
+                    You detected {st.detection.detectedErrorIds.length} of {(scenario.plantedErrors ?? []).length} planted errors.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.75rem' }}>
+              After you submit, your AI response and per-dimension feedback will appear here.
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   function renderPostSurvey() {
     return (
       <div className="lms-container">
@@ -2064,7 +2841,9 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
       </div>
       {stage === "consent" && renderConsent()}
       {stage === "preSurvey" && renderPreSurvey()}
+      {stage === "preAssess" && renderAssessment('pre')}
       {stage === "module" && renderModule()}
+      {stage === "modulePractice" && renderModulePractice()}
       {stage === "task" && renderTask()}
       {stage === "craftIntro" && renderCraftIntro()}
       {stage === "craftHuman" && renderCraftHuman()}
@@ -2074,6 +2853,7 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
       {stage === "craftReflect" && renderCraftReflect()}
       {stage === "craftExit" && renderCraftExit()}
       {stage === "postSurvey" && renderPostSurvey()}
+      {stage === "postAssess" && renderAssessment('post')}
       {stage === "complete" && renderComplete()}
     </div>
   );
