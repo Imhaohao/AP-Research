@@ -13,7 +13,6 @@ import {
   craftAiNarrativeChatSystemPrompt,
   craftRevisionCoachPrompt,
   NARRATIVE_PROMPT_BANK,
-  TWO_ARM_LABELS,
   twoArmConditionFromArm,
   usesLegacyTwoArmDesign,
   type StudyGroupSlug,
@@ -38,8 +37,11 @@ import {
 
 function formatOpenAiHelperError(message: string): string {
   const m = (message || '').trim();
-  if (/quota|billing|insufficient_quota|payment method/i.test(m)) {
-    return `${m} — Fix billing or add credits: https://platform.openai.com/account/billing`;
+  if (!m) {
+    return 'The AI assistant is temporarily unavailable. Please try again.';
+  }
+  if (/quota|billing|insufficient_quota|payment method|api key|openai_api_key|not configured/i.test(m)) {
+    return 'The AI assistant is temporarily unavailable. Please continue and try again later.';
   }
   return m;
 }
@@ -88,7 +90,6 @@ export default function PromptStudy({
   );
   const [assignFetchId, setAssignFetchId] = useState(0);
   const [assignErrorMsg, setAssignErrorMsg] = useState('');
-  const [assignWarningMsg, setAssignWarningMsg] = useState('');
   const [treatmentArm, setTreatmentArm] = useState<TreatmentArm | null>(null);
   const [participantSequence, setParticipantSequence] = useState<number | null>(null);
   const [modernStudyGroup, setModernStudyGroup] = useState<StudyGroupSlug | null>(null);
@@ -135,11 +136,12 @@ export default function PromptStudy({
         setParticipantSequence(
           j.participant_sequence !== undefined ? j.participant_sequence : null
         );
-        setAssignWarningMsg(j.warning ?? '');
         setAssignStatus('ready');
-      } catch (e) {
+      } catch {
         if (!cancelled) {
-          setAssignErrorMsg(e instanceof Error ? e.message : 'Assignment failed');
+          setAssignErrorMsg(
+            'We could not prepare your study materials right now. Please try again.'
+          );
           setAssignStatus('error');
         }
       }
@@ -646,12 +648,8 @@ export default function PromptStudy({
               </>
             ) : (
               <>
-                <li>Short pre-test: True/False questions, two short written prompts, a 3-question hallucination check, and 5 confidence ratings</li>
-                {twoArmCondition === 'treatment' ? (
-                  <li>Interactive 3-scenario prompt-engineering practice (ethical use, iterating on a weak AI reply, fact-checking AI output)</li>
-                ) : (
-                  <li>Short reading on digital literacy (similar time commitment)</li>
-                )}
+                <li>Short pre-test: True/False questions, two short written prompts, a 3-question factuality check, and 5 confidence ratings</li>
+                <li>Brief learning activities on digital literacy and prompt use</li>
                 <li>Narrative writing task with an AI assistant (your draft, an AI draft, compare, revise, reflect, exit ticket)</li>
                 <li>Short post-test matching the pre-test structure</li>
                 <li>Total time: about 55–70 minutes</li>
@@ -664,8 +662,8 @@ export default function PromptStudy({
 
           {!legacyTwoArm ? (
             <div className="form-group" style={{ background: '#FDF6E3', borderLeftColor: '#D4A843' }}>
-              <h4 style={{ marginTop: 0 }}>Your study condition</h4>
-              {assignStatus === 'loading' && <p style={{ marginBottom: 0 }}>Assigning your condition…</p>}
+              <h4 style={{ marginTop: 0 }}>Study setup</h4>
+              {assignStatus === 'loading' && <p style={{ marginBottom: 0 }}>Preparing your study materials…</p>}
               {assignStatus === 'error' && (
                 <div>
                   <p style={{ color: '#c62828', marginBottom: '0.5rem' }}>{assignErrorMsg}</p>
@@ -677,21 +675,8 @@ export default function PromptStudy({
               {assignStatus === 'ready' && treatmentArm !== null && (
                 <>
                   <p style={{ marginBottom: '0.35rem' }}>
-                    <strong>{TWO_ARM_LABELS[twoArmCondition].title}</strong>
+                    <strong>Your study materials are ready.</strong>
                   </p>
-                  <p style={{ marginBottom: '0.35rem', fontSize: '0.95rem' }}>
-                    {TWO_ARM_LABELS[twoArmCondition].description}
-                  </p>
-                  {participantSequence !== null ? (
-                    <p style={{ marginBottom: 0, fontSize: '0.85rem', color: '#555' }}>
-                      Enrollment order: {participantSequence}
-                    </p>
-                  ) : null}
-                  {assignWarningMsg ? (
-                    <p style={{ marginBottom: 0, marginTop: '0.75rem', fontSize: '0.85rem', color: '#8B7230' }}>
-                      {assignWarningMsg}
-                    </p>
-                  ) : null}
                 </>
               )}
             </div>
@@ -1324,7 +1309,7 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
           >
             <h3 style={{ marginTop: 0, color: '#004F2D' }}>ChatGPT · AI sample narrative</h3>
             <p style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>
-              The assistant is given your assignment prompt and your study condition. Ask for feedback or for the sample story; when
+              The assistant is given your assignment prompt. Ask for feedback or for the sample story; when
               you&apos;re satisfied, use the button below to paste the last reply into the AI story field.
             </p>
             <div
@@ -1403,7 +1388,7 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
           </div>
         ) : (
           <p style={{ marginTop: '1rem', color: '#666' }}>
-            Built-in ChatGPT is off (<code>GEMINI_SCHOOL_ONLY</code>). Use your school tool, then paste the AI story below.
+            Built-in ChatGPT is unavailable right now. Use your school tool, then paste the AI story below.
           </p>
         )}
         {schoolGeminiUrl ? (
@@ -1888,9 +1873,7 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
                 fontSize: '0.9rem',
               }}
             >
-              <strong>School Gemini URL not configured.</strong> Ask your teacher to set{' '}
-              <code>NEXT_PUBLIC_SCHOOL_GEMINI_URL</code> in the app environment, or set{' '}
-              <code>NEXT_PUBLIC_GEMINI_SCHOOL_ONLY=false</code> to use the built-in ChatGPT assistant instead.
+              <strong>School Gemini link is not available.</strong> Please ask your teacher for the correct school tool link, or continue with the built-in assistant if enabled.
             </div>
           ) : null}
 

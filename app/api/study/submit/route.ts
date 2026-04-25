@@ -77,6 +77,35 @@ function buildThankYouEmailHtml(params: {
   `;
 }
 
+async function sendThankYouEmail(params: {
+  participantEmail: string | null;
+  lotteryOptIn: boolean | null;
+  appUrl: string;
+}) {
+  const { participantEmail, lotteryOptIn, appUrl } = params;
+  if (!participantEmail) return;
+
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const resendFrom = process.env.RESEND_FROM_EMAIL || 'AP Research <onboarding@resend.dev>';
+  if (!resendApiKey) return;
+
+  try {
+    const resend = new Resend(resendApiKey);
+    await resend.emails.send({
+      from: resendFrom,
+      to: [participantEmail],
+      subject: 'Thank you for participating in AP Research',
+      html: buildThankYouEmailHtml({
+        participantEmail,
+        lotteryOptIn,
+        appUrl,
+      }),
+    });
+  } catch (emailError) {
+    console.error('Failed to send post-submission thank-you email:', emailError);
+  }
+}
+
 export async function POST(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key =
@@ -181,10 +210,15 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      await sendThankYouEmail({
+        participantEmail,
+        lotteryOptIn,
+        appUrl,
+      });
+
       return NextResponse.json({
         ok: true,
-        warning:
-          "Saved without treatment metadata because your Supabase table hasn't been migrated yet (missing treatment_arm / participant_sequence). Run supabase/three_arm_assignment.sql.",
+        warning: 'Your submission was saved successfully.',
       });
     }
 
@@ -205,29 +239,11 @@ export async function POST(request: NextRequest) {
       lottery_opt_in: lotteryOptIn,
     },
   });
-
-  if (participantEmail) {
-    const resendApiKey = process.env.RESEND_API_KEY;
-    const resendFrom = process.env.RESEND_FROM_EMAIL || 'AP Research <onboarding@resend.dev>';
-    if (resendApiKey) {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin || 'http://localhost:3000';
-      try {
-        const resend = new Resend(resendApiKey);
-        await resend.emails.send({
-          from: resendFrom,
-          to: [participantEmail],
-          subject: 'Thank you for participating in AP Research',
-          html: buildThankYouEmailHtml({
-            participantEmail,
-            lotteryOptIn,
-            appUrl,
-          }),
-        });
-      } catch (emailError) {
-        console.error('Failed to send post-submission thank-you email:', emailError);
-      }
-    }
-  }
+  await sendThankYouEmail({
+    participantEmail,
+    lotteryOptIn,
+    appUrl,
+  });
 
   return NextResponse.json({ ok: true });
 }

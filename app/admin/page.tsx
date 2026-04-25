@@ -48,6 +48,7 @@ export default function AdminPage() {
     `<p>Hi {{first_name}},</p>
 <p>This is a reminder to update your availability for the AP Research experiment.</p>
 <p>Your access code: <strong>{{access_code}}</strong></p>
+<p>Experiment website: <a href="{{app_url}}">{{app_url}}</a></p>
 <p>Update availability here: <a href="{{availability_url}}">{{availability_url}}</a></p>
 <p>Current availability label on file: {{availability_label}}</p>
 <p>Thanks!</p>`
