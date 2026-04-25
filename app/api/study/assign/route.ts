@@ -60,7 +60,7 @@ export async function GET() {
         );
         return assignFromRowCount(
           supabase,
-          'Approximate assignment (row count): RPC claim_next_participant_sequence is not installed. Open Supabase → SQL Editor → run supabase/three_arm_assignment.sql, then reload.'
+          'Study setup is using temporary assignment mode.'
         );
       }
       console.error('assign rpc error:', error);
@@ -87,6 +87,6 @@ export async function GET() {
   const supabase = createClient(url, anonKey);
   return assignFromRowCount(
     supabase,
-    'Approximate assignment (row count). For atomic order, set SUPABASE_SERVICE_ROLE_KEY and run supabase/three_arm_assignment.sql.'
+    'Study setup is using temporary assignment mode.'
   );
 }

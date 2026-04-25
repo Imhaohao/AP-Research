@@ -122,10 +122,15 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      await sendThankYouEmail({
+        participantEmail,
+        lotteryOptIn,
+        appUrl,
+      });
+
       return NextResponse.json({
         ok: true,
-        warning:
-          "Saved without treatment metadata because your Supabase table hasn't been migrated yet (missing treatment_arm / participant_sequence). Run supabase/three_arm_assignment.sql.",
+        warning: 'Your submission was saved successfully.',
       });
     }
 
@@ -146,6 +151,5 @@ export async function POST(request: NextRequest) {
       lottery_opt_in: lotteryOptIn,
     },
   });
-
   return NextResponse.json({ ok: true });
 }
