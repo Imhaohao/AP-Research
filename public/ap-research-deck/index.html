@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jerry Yan — AP Research — Teaching the Machine to Teach Us</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@6.0.1/dist/reset.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@6.0.1/dist/reveal.css" />
+    <link rel="stylesheet" href="./theme.css" />
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <!-- 1 Title -->
+        <section>
+          <div class="deck-slide deck-slide--title">
+            <div class="deck-orb" aria-hidden="true"></div>
+            <div class="deck-title-inner">
+              <p class="deck-kicker">AP Research · Oral defense · 2025–26</p>
+              <h1 class="deck-title-main">Teaching the Machine<br />to Teach Us</h1>
+              <p class="deck-title-sub">
+                Prompt-engineering instruction → reasoning, prompt quality &amp; AI literacy (PAUSD)
+              </p>
+              <p class="deck-title-meta">
+                Jerry Yan · Palo Alto USD · <span style="color: var(--soft)">apr-sooty.vercel.app</span>
+              </p>
+            </div>
+          </div>
+          <aside class="notes">
+            <p>
+              Open with eye contact, two-second pause. Frame: forty years from early neural nets to today’s ubiquity. One question: can a single class period of prompt-engineering instruction change
+              <em>how</em> high schoolers think with AI?
+            </p>
+          </aside>
+        </section>
+
+        <!-- 2 Hook -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">01 · Why this matters</p>
+            <h2>We are inside an AI paradigm shift</h2>
+            <div class="deck-hairline"></div>
+            <div class="deck-grid">
+              <div>
+                <p class="deck-sub">LLMs are reshaping school, work, and civic life.</p>
+                <ul class="icon-list">
+                  <li>
+                    <svg class="li-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                      <path stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span><strong>72%</strong> of U.S. teens — AI as companion (n = 1,060)</span>
+                  </li>
+                  <li>
+                    <svg class="li-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                      <path stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    <span>Heaviest AI use ↔ <strong>lowest</strong> critical-thinking scores in cohort</span>
+                  </li>
+                  <li>
+                    <svg class="li-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                      <path stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span>Offloading ↔ thinking: <strong>r = −0.75</strong> (ages 17–25)</span>
+                  </li>
+                  <li>
+                    <svg class="li-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                      <path stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span>Young users: highest dependence + weakest critical thinking</span>
+                  </li>
+                </ul>
+              </div>
+              <div class="deck-stat-card">
+                <span class="deck-pill">Stat of the day</span>
+                <p class="deck-stat-num">72%</p>
+                <p class="deck-stat-cap">of U.S. teens already use AI as a companion. Habits formed now carry into work and college.</p>
+              </div>
+            </div>
+            <div class="deck-footer">
+              Common Sense Media, 2025 · Gerlich, “AI Tools in Society,” <em>Societies</em>, 2025
+            </div>
+          </div>
+          <aside class="notes">
+            <p>
+              Gesture at the 72% block; hold one beat. Script: three in four teens already talk to AI like a friend; the youngest, heaviest users also score lowest on critical thinking. The question is
+              not whether they will use AI — it’s whether we teach them to use it well. Tone: serious, slower pacing.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 3 Two modes -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">01 · Mechanism</p>
+            <h2>Two modes of use — only one protects learning</h2>
+            <div class="deck-hairline"></div>
+            <div class="deck-duo">
+              <div class="deck-card">
+                <span class="deck-tag deck-tag--bad">Substitutive</span>
+                <h3>AI replaces thinking</h3>
+                <ul class="icon-list">
+                  <li><span class="mark-bad">✕</span> 42% of help requests with <strong>zero</strong> attempt first</li>
+                  <li><span class="mark-bad">✕</span> ↓ understanding even when output volume ↑</li>
+                  <li><span class="mark-bad">✕</span> EEG: weakest coupling vs. solo writing</li>
+                  <li><span class="mark-bad">✕</span> One substitutive episode hurts later performance</li>
+                </ul>
+              </div>
+              <div class="deck-card deck-card--accent">
+                <span class="deck-tag deck-tag--good">Complementary</span>
+                <h3>AI scaffolds thinking</h3>
+                <ul class="icon-list">
+                  <li><span class="mark-good">✓</span> Explain-first prompts → ↑ understanding</li>
+                  <li><span class="mark-good">✓</span> Quasi-exp.: comprehension &amp; CT gains (n = 110)</li>
+                  <li><span class="mark-good">✓</span> Mediated by <strong>prompt craft</strong></li>
+                  <li><span class="mark-good">✓</span> Effect rides on how input is framed</li>
+                </ul>
+              </div>
+            </div>
+            <div class="deck-footer">Lehmann et al., 2025 · Kosmyna et al., 2024 · Eltahir &amp; Babiker, 2024</div>
+          </div>
+          <aside class="notes">
+            <p>
+              Center stage; gesture left then right. Three labs converge: substitution collapses learning; complementarity grows it. The dial between them is prompting. Pause before advancing.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 4 Cognitive debt -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">01 · Neuroscience</p>
+            <h2>Cognitive debt — quieter brains after AI writing</h2>
+            <div class="deck-hairline"></div>
+            <div class="deck-grid">
+              <div>
+                <ul class="icon-list">
+                  <li>
+                    <svg class="li-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                    <span>MIT EEG · <strong>n = 55</strong> · three writing conditions</span>
+                  </li>
+                  <li>
+                    <svg class="li-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+                    <span>LLM-assisted → <strong>weakest</strong> neural coupling</span>
+                  </li>
+                  <li>
+                    <svg class="li-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <span>Minutes later: <strong>83.3%</strong> less recall of “their” prose</span>
+                  </li>
+                </ul>
+              </div>
+              <div class="deck-stat-card">
+                <span class="deck-pill">MIT · n = 55</span>
+                <p class="deck-stat-num">83.3%</p>
+                <p class="deck-stat-cap">drop in unaided recall after one AI-assisted session. One exposure leaves a trace.</p>
+              </div>
+            </div>
+            <div class="deck-footer">Kosmyna et al., “Your Brain on ChatGPT,” arXiv, 2024</div>
+          </div>
+          <aside class="notes">
+            <p>
+              Slow down — emotional beat. “Cognitive debt” like financial debt: invisible until compounded. MIT measured connectivity in real time and saw the brain disengage. Hold the 83.3% on screen
+              before advancing.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 5 Full-bleed hero -->
+        <section class="deck-fullbleed">
+          <div
+            class="deck-bg"
+            style="background-image: url('https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&amp;fit=crop&amp;w=1920&amp;q=80')"
+            role="img"
+            aria-label="Students collaborating"
+          ></div>
+          <div class="deck-slide">
+            <p class="deck-hero-line"><em>Literacy</em> is the dial between substitutive harm and complementary help.</p>
+          </div>
+          <aside class="notes">
+            <p>
+              Full-bleed beat — let the image land. Bridge: policy often treats all student AI use the same; research says mode of use matters more than the tool. Transition to “how we teach the dial.”
+            </p>
+          </aside>
+        </section>
+
+        <!-- 6 Lever -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">01 · The lever</p>
+            <h2>Prompt engineering = programming with language</h2>
+            <div class="deck-hairline"></div>
+            <p class="deck-sub">“Input granularity ↔ output utility.” — MIT Sloan, 2025</p>
+            <div class="deck-tiles">
+              <div class="deck-tile">
+                <svg class="tile-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                <strong>Role</strong>
+                Who should the model be?
+              </div>
+              <div class="deck-tile">
+                <svg class="tile-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M4 6h16M4 12h16M4 18h7" /></svg>
+                <strong>Context</strong>
+                What task &amp; constraints?
+              </div>
+              <div class="deck-tile">
+                <svg class="tile-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                <strong>Task</strong>
+                What artifact, what shape?
+              </div>
+              <div class="deck-tile">
+                <svg class="tile-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                <strong>Verify</strong>
+                Check outputs — always.
+              </div>
+            </div>
+            <div class="deck-footer">MIT Sloan, 2025 · Dennison et al., AAAI 2024 · Park &amp; Choo, 2024 · Chang et al., 2025</div>
+          </div>
+          <aside class="notes">
+            <p>
+              Walk left-to-right across tiles; lift intonation on Verify — bridge to your hallucination scenario. Prompt engineering is literacy with four moves students can rehearse in 25 minutes.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 7 Gap -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">01 · Gap</p>
+            <h2>Curricula exist — controlled K‑12 evidence doesn’t</h2>
+            <div class="deck-hairline"></div>
+            <div class="deck-grid">
+              <div>
+                <ul class="icon-list">
+                  <li>
+                    <svg class="li-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                    <span>CRAFT, Prompty, IDEA/PARTS, Gen/ReGen logs</span>
+                  </li>
+                  <li>
+                    <svg class="li-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    <span>K‑12 PE review: <strong>2 / 30</strong> studies ran with real students</span>
+                  </li>
+                  <li>
+                    <svg class="li-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                    <span>~60% don’t publish prompts → weak reproducibility</span>
+                  </li>
+                  <li>
+                    <svg class="li-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                    <span>No quasi-experiment in a <strong>restrictive-AI</strong> district like PAUSD</span>
+                  </li>
+                </ul>
+              </div>
+              <div class="deck-stat-card">
+                <span class="deck-pill">Research gap</span>
+                <p class="deck-stat-num" style="font-size: 1.8em">2 / 30</p>
+                <p class="deck-stat-cap">classroom-based K‑12 prompt-engineering studies in the latest systematic review.</p>
+              </div>
+            </div>
+            <div class="deck-footer">Chen et al., arXiv 2024 · Dennison et al., 2024 · Park &amp; Choo, 2024 · Gogan, 2024</div>
+          </div>
+          <aside class="notes">
+            <p>
+              Energy shift — locate your contribution. Stanford, MIT Sloan, Cornell have frameworks; the field lacks scored, real-student contrasts under tight policy. You close that gap with an
+              open-source platform.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 8 RQ -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">02 · Research question</p>
+            <h2>One question, three operational pillars</h2>
+            <div class="deck-hairline"></div>
+            <p class="deck-sub">
+              Does explicit prompt-engineering instruction change how PAUSD high schoolers use LLMs — reasoning behavior, prompt quality, hallucination handling?
+            </p>
+            <div class="deck-chips">
+              <div class="deck-chip"><b>RQ1</b> · Substitutive use · copy-paste, overlap, revisions</div>
+              <div class="deck-chip"><b>RQ2</b> · Prompt quality · 6-dimension rubric pass rates</div>
+              <div class="deck-chip"><b>RQ3</b> · Hallucinations · detect + correct planted errors</div>
+            </div>
+          </div>
+          <aside class="notes">
+            <p>
+              Read the main RQ slowly; then tap each chip. Three DVs — behavior, craft, judgment — let you answer the headline question with statistics, not vibes. This is Row 1 of the rubric.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 9 Hypotheses -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">02 · Hypotheses</p>
+            <h2>Predictions + what would falsify them</h2>
+            <div class="deck-hairline"></div>
+            <div class="deck-hyp">
+              <span class="tag">H1</span>
+              <div><strong>↓ substitutive indices</strong> in treatment · Falsified if no arm difference at α = .05</div>
+              <span class="tag">H2</span>
+              <div><strong>↑ rubric passes</strong> · largest on Background &amp; Request Elaboration · Falsified if scores tie</div>
+              <span class="tag">H3</span>
+              <div><strong>↑ detect + classify</strong> planted errors · Falsified if accuracy matches control</div>
+            </div>
+          </div>
+          <aside class="notes">
+            <p>
+              Read falsifiers aloud — AP “Establish argument” rewards pre-registered counter-evidence. Null results are informative, not embarrassing, because each H has a clear disproof test.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 10 Methods -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">03 · Design</p>
+            <h2>Two-arm quasi-experiment · ≤ 60 min · same platform</h2>
+            <div class="deck-hairline"></div>
+            <p class="deck-sub">Volunteers → sequence-based assignment · treatment arms collapsed for primary analysis</p>
+            <div class="deck-steps">
+              <div class="deck-step"><span class="n">1</span> Pre-baseline (~5′)</div>
+              <div class="deck-step"><span class="n">2</span> Module / placebo (~25–30′)</div>
+              <div class="deck-step"><span class="n">3</span> CRAFT writing (~15–20′)</div>
+              <div class="deck-step"><span class="n">4</span> Post-survey (~5′)</div>
+              <div class="deck-step"><span class="n">5</span> Optional 1-mo ping</div>
+            </div>
+            <div class="deck-footer">Lehmann et al., 2025 · Eltahir &amp; Babiker, 2024</div>
+          </div>
+          <aside class="notes">
+            <p>
+              Dense slide — speak slowly; point at each step. Only the middle 25 minutes differ between arms; everything else is shared. That isolates the instructional manipulation.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 11 Sampling -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">03 · Sampling</p>
+            <h2>PAUSD high schools · volunteer recruitment</h2>
+            <div class="deck-hairline"></div>
+            <div class="deck-grid">
+              <div>
+                <ul class="icon-list">
+                  <li><svg class="li-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg> Gunn &amp; Palo Alto High · Schoology + posters + form</li>
+                  <li><svg class="li-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Identical incentive across arms (e.g., GPT Pro voucher)</li>
+                  <li><svg class="li-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Exclude &gt;1 hr prior PE bootcamps</li>
+                </ul>
+              </div>
+              <div class="deck-stat-card">
+                <span class="deck-pill">Target n</span>
+                <p class="deck-stat-num">30</p>
+                <p class="deck-stat-cap">Powers two-tailed t-test, large d (~0.95), α = .05, β = .20 — conservative for a 25′ dose.</p>
+              </div>
+            </div>
+          </div>
+          <aside class="notes">
+            <p>
+              Acknowledge n = 30 up front for Reflect points. Small but pre-registered; large expected effect; every flagged prompt can be hand-audited. Honest about volunteer bias.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 12 Scenarios -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">03 · Intervention</p>
+            <h2>Three scenarios → three pillars</h2>
+            <div class="deck-hairline"></div>
+            <div class="deck-s3">
+              <div class="s">
+                <div class="s-top"><span class="sid">S1</span><span style="color: var(--hot-pink); font-weight: 700">RQ1</span></div>
+                <strong>Ethical use</strong>
+                <p style="margin: 0.25rem 0 0; font-size: 0.95em; color: var(--soft)">When <em>not</em> to delegate · disclosure</p>
+              </div>
+              <div class="s">
+                <div class="s-top"><span class="sid">S2</span><span style="color: var(--hot-pink); font-weight: 700">RQ2</span></div>
+                <strong>Iteration</strong>
+                <p style="margin: 0.25rem 0 0; font-size: 0.95em; color: var(--soft)">Weak reply → better prompt</p>
+              </div>
+              <div class="s">
+                <div class="s-top"><span class="sid">S3</span><span style="color: var(--hot-pink); font-weight: 700">RQ3</span></div>
+                <strong>Verification</strong>
+                <p style="margin: 0.25rem 0 0; font-size: 0.95em; color: var(--soft)">3 planted errors · fix &amp; classify</p>
+              </div>
+            </div>
+            <p style="margin-top: 0.75rem; font-size: 0.48em; color: var(--muted)">
+              Control: matched-length digital-literacy reading — no PE content.
+            </p>
+            <div class="deck-footer">Dennison et al., 2024 · Park &amp; Choo, 2024 · Chang et al., 2025</div>
+          </div>
+          <aside class="notes">
+            <p>
+              Spine of the study: same auto-rubric every scenario; data shape stays parallel across RQs. Control arm is equal time, different content — credible placebo.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 13 Rubric -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">03 · Scoring</p>
+            <h2>Six binary dimensions → one judge</h2>
+            <div class="deck-hairline"></div>
+            <div class="deck-rubric">
+              <div class="r"><strong>Relevance</strong>On-task</div>
+              <div class="r"><strong>Purpose</strong>States why</div>
+              <div class="r"><strong>Concise</strong>No fluff</div>
+              <div class="r"><strong>Background</strong>Context in</div>
+              <div class="r"><strong>Elaboration</strong>Output shape</div>
+              <div class="r"><strong>Not direct answer</strong>S1 only</div>
+            </div>
+            <p style="margin-top: 0.65rem; font-size: 0.48em; color: var(--soft)">
+              GPT-4o · T = 0 · JSON · scenario-aware system prompt · PASS/FAIL per dimension
+            </p>
+            <div class="deck-footer">Xiao et al., 2025 · Chen et al., 2024 · Leung, 2024</div>
+          </div>
+          <aside class="notes">
+            <p>
+              Engineering choice: LLM-as-judge anchored to Xiao et al. Same model, same temperature, same rubric text — every prompt answers the same six gates. S1 uses six dims; S2/S3 use five.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 14 Battery -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">03 · Instruments</p>
+            <h2>Pre/post battery</h2>
+            <div class="deck-hairline"></div>
+            <div class="deck-batt">
+              <div class="b">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                T/F · concepts
+              </div>
+              <div class="b">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                Open · when not / how to verify
+              </div>
+              <div class="b">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                Hallucination items
+              </div>
+              <div class="b">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" /></svg>
+                Likert confidence
+              </div>
+              <div class="b">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                CRAFT · logged turns
+              </div>
+            </div>
+          </div>
+          <aside class="notes">
+            <p>
+              Five instruments mapped to RQs. CRAFT is the behavioral arena — substitutive indices come from turn logs, not self-report alone.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 15 Platform -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">03 · Tooling</p>
+            <h2>Next.js · Supabase · open source</h2>
+            <div class="deck-hairline"></div>
+            <div class="deck-grid">
+              <div>
+                <ul class="icon-list">
+                  <li><svg class="li-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" /></svg> Vercel deploy · Postgres + RLS</li>
+                  <li><svg class="li-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" /></svg> SQL views flatten attempts → analysis-ready</li>
+                  <li><svg class="li-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg> Assignment: <code style="color: var(--hot-pink)">participant_sequence % 3</code></li>
+                </ul>
+              </div>
+              <div class="deck-stat-card">
+                <span class="deck-pill">Live + code</span>
+                <p class="deck-stat-cap" style="margin-top: 0.5rem"><strong style="color: var(--white)">apr-sooty.vercel.app</strong></p>
+                <p class="deck-stat-cap">github.com/Imhaohao/AP-Research</p>
+              </div>
+            </div>
+          </div>
+          <aside class="notes">
+            <p>
+              End-to-end stack you built — replication is fork + swap recruitment copy. Mention typed API routes for the grader and JSON-only outputs for clean parsing.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 16 Auto-grader -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">04 · Validation</p>
+            <h2>Human audit · Cohen’s κ</h2>
+            <div class="deck-hairline"></div>
+            <p class="deck-sub">15% stratified sample · dual human raters · consensus vs. GPT-4o</p>
+            <table class="deck-table">
+              <thead>
+                <tr>
+                  <th>Dimension</th>
+                  <th>Pass/Fail κ</th>
+                  <th>Explain κ</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Relevance</td>
+                  <td>.98</td>
+                  <td>.98</td>
+                </tr>
+                <tr>
+                  <td>Clarity of purpose</td>
+                  <td>.85</td>
+                  <td>.87</td>
+                </tr>
+                <tr>
+                  <td>Conciseness</td>
+                  <td>.93</td>
+                  <td>.96</td>
+                </tr>
+                <tr>
+                  <td>Background</td>
+                  <td>.96</td>
+                  <td>.95</td>
+                </tr>
+                <tr>
+                  <td>Request elaboration</td>
+                  <td>.90</td>
+                  <td>.72</td>
+                </tr>
+                <tr>
+                  <td>Not direct answer</td>
+                  <td>.88</td>
+                  <td>.91</td>
+                </tr>
+                <tr>
+                  <td>Overall</td>
+                  <td>.92</td>
+                  <td>.95</td>
+                </tr>
+              </tbody>
+            </table>
+            <p style="font-size: 0.42em; color: var(--hot-pink); margin-top: 0.35rem">Targets: κ ≥ .80 (raters) · κ ≥ .92 (auto vs. gold)</p>
+            <div class="deck-footer">Xiao et al., 2025</div>
+          </div>
+          <aside class="notes">
+            <p>
+              Anticipate skepticism: show the audit protocol. Mean auto–human agreement ~.92; Request Elaboration is the weakest cell — third rater round before locking analysis. Be transparent.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 17 RQ1 results -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">04 · Results</p>
+            <h2>RQ1 · Substitutive use</h2>
+            <div class="deck-hairline"></div>
+            <div class="deck-ph">[ Bar chart: substitutive index by arm ]</div>
+            <p class="deck-sub" style="margin-top: 0.5rem">Placeholder · Welch <em>t</em> / Mann–Whitney · Cohen’s <em>d</em> + bootstrap CI</p>
+            <div class="deck-footer">Lehmann et al., 2025 · Kosmyna et al., 2024</div>
+          </div>
+          <aside class="notes">
+            <p>
+              On defense day, drop final means and effect size here. Narrate direction first, then uncertainty. Placeholder keeps structure visible for AP graders now.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 18 RQ2 results -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">04 · Results</p>
+            <h2>RQ2 · Prompt quality</h2>
+            <div class="deck-hairline"></div>
+            <div class="deck-ph">[ Radar: six dimensions · arm × time ]</div>
+            <p class="deck-sub" style="margin-top: 0.5rem">Expect largest lifts on Background &amp; Request Elaboration · mixed ANOVA · Holm follow-ups</p>
+            <div class="deck-footer">Dennison et al., 2024 · Park &amp; Choo, 2024 · Chen et al., 2024</div>
+          </div>
+          <aside class="notes">
+            <p>
+              Why those two dimensions? They’re what students fully control; relevance/conciseness partly reflect scenario. Cleanest pedagogy signal.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 19 RQ3 results -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">04 · Results</p>
+            <h2>RQ3 · Hallucination handling</h2>
+            <div class="deck-hairline"></div>
+            <div class="deck-ph">[ Confusion grid: detect × correct ]</div>
+            <p class="deck-sub" style="margin-top: 0.5rem">% of 3 planted errors detected <em>and</em> classified · Cochran-Armitage · bootstrap CI</p>
+            <div class="deck-footer">Chang et al., 2025 · Singhal et al., 2023 · Shojaee et al., 2025</div>
+          </div>
+          <aside class="notes">
+            <p>
+              Safety outcome: even experts miss subtle hallucinations in clinical red-teaming. You’re asking whether 25′ of instruction moves teenagers at all — frame as harm-reduction literacy.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 20 Argument -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">05 · Argument</p>
+            <h2>Evidence → bridge → stakes</h2>
+            <div class="deck-hairline"></div>
+            <div class="deck-chain">
+              <div class="row"><span class="lbl">Evidence</span><span>Substitutive use hurts learning; complementarity helps — converging labs</span></div>
+              <div class="row"><span class="lbl">Bridge</span><span>Prompt engineering steers mode of use</span></div>
+              <div class="row"><span class="lbl">Claim</span><span>Short PE module shifts student AI habits when well designed</span></div>
+              <div class="row"><span class="lbl">School</span><span>Literacy-first beats blanket restriction</span></div>
+              <div class="row"><span class="lbl">Field</span><span>Real-classroom scored data for K‑12 PE</span></div>
+            </div>
+            <div class="deck-footer">Lehmann et al., 2025 · Gerlich, 2025 · Kosmyna et al., 2024 · Chen et al., 2024</div>
+          </div>
+          <aside class="notes">
+            <p>
+              Row 2 rubric: explicit chain. Tap each row. Thesis: AI isn’t inherently good or bad — literacy is the dial; PAUSD’s default policy under-protects if it ignores mode of use.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 21 Implications -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">05 · Implications</p>
+            <h2>If H1–H3 hold…</h2>
+            <div class="deck-hairline"></div>
+            <div class="deck-triple">
+              <div class="deck-card">
+                <span class="deck-pill" style="font-size: 0.65em">PAUSD</span>
+                <ul class="icon-list" style="margin-top: 0.5rem; font-size: 0.92em">
+                  <li><span class="mark-good">→</span> Pilot 25′ module</li>
+                  <li><span class="mark-good">→</span> Disclosure + verify rubrics</li>
+                  <li><span class="mark-good">→</span> Train staff on 6-dim judge</li>
+                </ul>
+              </div>
+              <div class="deck-card">
+                <span class="deck-pill" style="font-size: 0.65em">Schools</span>
+                <ul class="icon-list" style="margin-top: 0.5rem; font-size: 0.92em">
+                  <li><span class="mark-good">→</span> Low-cost, OSS intervention</li>
+                  <li><span class="mark-good">→</span> Aligns w/ AILit frames</li>
+                  <li><span class="mark-good">→</span> Missing evidence gap filled</li>
+                </ul>
+              </div>
+              <div class="deck-card">
+                <span class="deck-pill" style="font-size: 0.65em">Research</span>
+                <ul class="icon-list" style="margin-top: 0.5rem; font-size: 0.92em">
+                  <li><span class="mark-good">→</span> Calibrated auto-grader reuse</li>
+                  <li><span class="mark-good">→</span> Forkable 2-arm design</li>
+                  <li><span class="mark-good">→</span> Ties to CRAFT / Cornell ethics</li>
+                </ul>
+              </div>
+            </div>
+            <div class="deck-footer">Dennison et al., 2024 · Xie et al., 2024 · Cornell CTI, 2024</div>
+          </div>
+          <aside class="notes">
+            <p>
+              Three columns left-to-right; end with eye contact on “Research” column for faculty judges. Connect to open replication, not just local policy.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 22 Limitations -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">05 · Limits</p>
+            <h2>What this study cannot claim yet</h2>
+            <div class="deck-hairline"></div>
+            <div class="deck-grid">
+              <div>
+                <ul class="icon-list">
+                  <li>Single district · volunteer sample</li>
+                  <li>Underpowered 3-arm split</li>
+                  <li>Auto-grader weakest on Request Elaboration</li>
+                  <li>Optional retention → attrition risk</li>
+                  <li>CRAFT lab task ≠ full coursework transfer</li>
+                </ul>
+              </div>
+              <div class="deck-stat-card">
+                <span class="deck-pill">Next</span>
+                <ul class="icon-list" style="margin-top: 0.35rem; font-size: 0.95em">
+                  <li>n ≈ 90 · multi-district</li>
+                  <li>Restore prompt-bank contrast</li>
+                  <li>3-mo coursework follow-up</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <aside class="notes">
+            <p>
+              Reading limitations aloud strengthens Reflect — don’t soften. Shows mature science; pairs each limit with a forward step where possible.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 23 Reflection -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">06 · Reflection</p>
+            <h2>How my thinking moved</h2>
+            <div class="deck-hairline"></div>
+            <div class="deck-chain">
+              <div class="row"><span class="lbl">Start</span><span>Ban-first stance</span></div>
+              <div class="row"><span class="lbl">Literature</span><span>Harm = <em>mode</em>, not model</span></div>
+              <div class="row"><span class="lbl">Instruments</span><span>My own prompts failed the rubric</span></div>
+              <div class="row"><span class="lbl">Calibration</span><span>Rewrote elaboration dimension prose</span></div>
+              <div class="row"><span class="lbl">Now</span><span>Which 25′ turn substitutive → complementary?</span></div>
+            </div>
+          </div>
+          <aside class="notes">
+            <p>
+              Rubric Row 3 — show evolution, not a hero arc. Last line is the thesis you want them to repeat back in Q&amp;A.
+            </p>
+          </aside>
+        </section>
+
+        <!-- 24 Closing + works cited -->
+        <section>
+          <div class="deck-slide">
+            <p class="deck-eyebrow">07 · Close</p>
+            <h2>We don’t ban literacy — we teach it.</h2>
+            <div class="deck-hairline"></div>
+            <p class="deck-sub">Open, scored, 25-minute bet you can fork.</p>
+            <p style="font-size: 0.44em; color: var(--muted); margin-top: 1rem">
+              Jerry Yan · apr-sooty.vercel.app · github.com/Imhaohao/AP-Research
+            </p>
+            <h3 style="margin-top: 1.25rem; font-size: 0.55em">Works cited (MLA)</h3>
+            <div class="deck-cite">
+              <p>Chang, C. T., et al. “Red Teaming ChatGPT in Medicine…” <em>npj Digital Medicine</em>, vol. 8, no. 149, 2025.</p>
+              <p>Chen, B., et al. “Unleashing the Potential of Prompt Engineering…” <em>Patterns</em>, vol. 6, no. 6, 2025.</p>
+              <p>Chen, I-Sheng, et al. “Systematic Review on PE in K-12 STEM…” arXiv, 2024.</p>
+              <p>Common Sense Media. “Nearly 3 in 4 Teens Have Used AI Companions…” 2025.</p>
+              <p>Cornell U. Center for Teaching Innovation. “Ethical AI for Teaching and Learning.” 2024.</p>
+              <p>Dennison, D. V., et al. “Prompty…” <em>AAAI</em>, vol. 37, no. 13, 2024.</p>
+              <p>Eltahir, M. E., and F. M. E. Babiker. “AI Tools and Student Performance…” <em>EJEL</em>, vol. 22, no. 9, 2024.</p>
+              <p>Gerlich, M. “AI Tools in Society…” <em>Societies</em>, vol. 15, no. 1, 2025.</p>
+              <p>Gogan, B. “The Gen/ReGen Log…” WAC Clearinghouse, 2024.</p>
+              <p>Kabeer, A., et al. “Enhancing Creative Writing…” <em>Forum for Linguistic Studies</em>, 2025.</p>
+              <p>Kosmyna, N., et al. “Your Brain on ChatGPT…” arXiv, 2024.</p>
+              <p>Lehmann, M., et al. “AI Meets the Classroom…” arXiv, 2025.</p>
+              <p>Leung, C. H. “Promoting Optimal Learning with ChatGPT…” <em>Asian J. Contemporary Education</em>, vol. 8, no. 2, 2024.</p>
+              <p>Maharjan, J., et al. “OpenMedLM…” <em>Scientific Reports</em>, vol. 14, no. 14156, 2024.</p>
+              <p>MIT Sloan Teaching &amp; Learning Technologies. “Effective Prompts for AI: The Essentials.” 2025.</p>
+              <p>Park, J., and S. Choo. “Generative AI PE for Educators…” <em>JSET</em>, 2024.</p>
+              <p>Patel, D., et al. “Evaluating PE on GPT-3.5…” <em>Scientific Reports</em>, vol. 14, no. 17341, 2024.</p>
+              <p>Shojaee, P., et al. “The Illusion of Thinking.” Apple ML Research, 2025.</p>
+              <p>Singhal, K., et al. “LLMs Encode Clinical Knowledge.” <em>Nature</em>, vol. 620, 2023.</p>
+              <p>Vatsal, S., et al. “Multilingual Prompt Engineering Survey.” arXiv, 2025.</p>
+              <p>Woo, D. J., et al. “EFL Students’ PE Pathways.” arXiv, 2023.</p>
+              <p>Xiao, Z., et al. “Rubric-Anchored LLM-as-Judge…” 2025.</p>
+              <p>Xie, B., et al. “Teachers’ Considerations for AI…” <em>AAAI</em>, vol. 38, no. 21, 2024.</p>
+            </div>
+          </div>
+          <aside class="notes">
+            <p>
+              Two beats of silence. Eye contact. “Thank you — I’m ready for questions.” Works cited is for auditors; you don’t read it aloud.
+            </p>
+          </aside>
+        </section>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@6.0.1/dist/reveal.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@6.0.1/dist/plugin/notes.js"></script>
+    <script>
+      Reveal.initialize({
+        hash: true,
+        slideNumber: "c/t",
+        progress: true,
+        center: false,
+        width: 1280,
+        height: 720,
+        margin: 0.04,
+        transition: "slide",
+        backgroundTransition: "fade",
+        plugins: [RevealNotes],
+      });
+    </script>
+  </body>
+</html>

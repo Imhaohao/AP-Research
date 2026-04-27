@@ -1,0 +1,629 @@
+/**
+ * AP Research deck — matches PPTX theme: black → wine gradient, magenta / hot pink, Poppins.
+ * Minimal on-slide chrome; content uses .deck-slide layout helpers.
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap");
+
+:root {
+  --wine: #34011f;
+  --black: #000000;
+  --magenta: #a9088e;
+  --hot-pink: #fb47de;
+  --white: #ffffff;
+  --soft: #e9e2e6;
+  --muted: #b6a8b0;
+  --card: #2c2227;
+  --hairline: #55334a;
+}
+
+/* Reset reveal defaults that fight our layout */
+.reveal .slides {
+  text-align: left;
+}
+
+.reveal .slides section {
+  padding: 0 !important;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.reveal .backgrounds {
+  background: linear-gradient(135deg, var(--black) 0%, var(--black) 45%, var(--wine) 100%);
+}
+
+.reveal {
+  font-family: "Poppins", system-ui, sans-serif;
+  color: var(--soft);
+  font-size: 28px;
+  font-weight: 400;
+}
+
+.reveal h1,
+.reveal h2,
+.reveal h3 {
+  font-family: "Poppins", system-ui, sans-serif;
+  font-weight: 700;
+  color: var(--white);
+  text-transform: none;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 0 0 0.35em;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.45);
+}
+
+.reveal h1 {
+  font-size: 2.35em;
+}
+.reveal h2 {
+  font-size: 1.55em;
+}
+.reveal h3 {
+  font-size: 1.05em;
+  color: var(--hot-pink);
+}
+
+.reveal .slide-number {
+  right: 1.75rem;
+  top: 1.25rem;
+  bottom: auto;
+  left: auto;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.55em;
+  font-weight: 600;
+  opacity: 1;
+}
+
+.reveal .progress {
+  color: var(--hot-pink);
+  height: 3px;
+}
+
+/* ---- Slide frame ---- */
+.deck-slide {
+  position: relative;
+  z-index: 1;
+  min-height: 100%;
+  padding: 2.5rem 3.25rem 3.5rem;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.deck-slide--title {
+  justify-content: center;
+  padding-left: 4rem;
+}
+
+.deck-slide--title::before {
+  content: "";
+  position: absolute;
+  left: 2.5rem;
+  top: 28%;
+  width: 5px;
+  height: 22%;
+  background: var(--hot-pink);
+  border-radius: 2px;
+}
+
+.deck-eyebrow {
+  font-size: 0.42em;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--hot-pink);
+  margin-bottom: 0.35rem;
+}
+
+.deck-hairline {
+  width: 3.2rem;
+  height: 3px;
+  background: var(--hot-pink);
+  border-radius: 2px;
+  margin: 0.5rem 0 1rem;
+}
+
+.deck-sub {
+  font-size: 0.62em;
+  font-weight: 600;
+  color: var(--white);
+  max-width: 36rem;
+  line-height: 1.35;
+  margin-bottom: 0.85rem;
+}
+
+.deck-footer {
+  position: absolute;
+  left: 3.25rem;
+  right: 3.25rem;
+  bottom: 1.15rem;
+  font-size: 0.28em;
+  line-height: 1.45;
+  color: var(--muted);
+  border-top: 1px solid rgba(85, 51, 74, 0.55);
+  padding-top: 0.45rem;
+}
+
+/* Two-column + stat card (hook slide) */
+.deck-grid {
+  display: grid;
+  grid-template-columns: 1fr minmax(14rem, 0.42fr);
+  gap: 2rem;
+  align-items: start;
+  flex: 1;
+  margin-top: 0.25rem;
+}
+
+@media (max-width: 900px) {
+  .deck-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.deck-stat-card {
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem 1.35rem;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.deck-pill {
+  display: inline-block;
+  background: var(--magenta);
+  color: var(--white);
+  font-size: 0.38em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  margin-bottom: 0.75rem;
+}
+
+.deck-stat-num {
+  font-size: 2.8em;
+  font-weight: 700;
+  color: var(--hot-pink);
+  line-height: 1;
+  margin: 0.15rem 0 0.5rem;
+}
+
+.deck-stat-cap {
+  font-size: 0.48em;
+  line-height: 1.45;
+  color: var(--soft);
+}
+
+/* Icon bullets */
+.icon-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.56em;
+  line-height: 1.45;
+}
+
+.icon-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin-bottom: 0.55rem;
+  color: var(--soft);
+}
+
+.icon-list li:last-child {
+  margin-bottom: 0;
+}
+
+.li-ico {
+  width: 1.15em;
+  height: 1.15em;
+  flex-shrink: 0;
+  margin-top: 0.12em;
+  color: var(--hot-pink);
+}
+
+/* Dual cards (substitutive / complementary) */
+.deck-duo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  flex: 1;
+  font-size: 0.52em;
+}
+
+.deck-card {
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  padding: 1rem 1.1rem;
+}
+
+.deck-card--accent {
+  border-color: rgba(169, 8, 142, 0.45);
+}
+
+.deck-card h3 {
+  font-size: 1.05em;
+  margin-bottom: 0.5rem;
+}
+
+.deck-tag {
+  display: inline-block;
+  font-size: 0.75em;
+  font-weight: 700;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  margin-bottom: 0.5rem;
+  color: var(--white);
+}
+
+.deck-tag--bad {
+  background: #8b1427;
+}
+.deck-tag--good {
+  background: var(--magenta);
+}
+
+.mark-bad {
+  color: #ff6b7a;
+  font-weight: 700;
+  margin-right: 0.35rem;
+}
+.mark-good {
+  color: #5cffb0;
+  font-weight: 700;
+  margin-right: 0.35rem;
+}
+
+/* 4-tile row */
+.deck-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.85rem;
+  margin-top: 0.75rem;
+  font-size: 0.48em;
+}
+
+.deck-tile {
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 0.75rem 0.8rem;
+}
+
+.deck-tile .tile-ico {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--hot-pink);
+  margin-bottom: 0.35rem;
+}
+
+.deck-tile strong {
+  display: block;
+  color: var(--hot-pink);
+  font-size: 0.95em;
+  margin-bottom: 0.25rem;
+}
+
+/* RQ chips */
+.deck-chips {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-top: 0.85rem;
+  font-size: 0.5em;
+}
+
+.deck-chip {
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 0.65rem 0.75rem;
+}
+
+.deck-chip b {
+  color: var(--hot-pink);
+  font-size: 0.9em;
+}
+
+/* Hypothesis rows */
+.deck-hyp {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.65rem 1rem;
+  align-items: start;
+  font-size: 0.5em;
+  margin-top: 0.5rem;
+}
+
+.deck-hyp .tag {
+  font-weight: 700;
+  color: var(--hot-pink);
+  font-size: 1.1em;
+}
+
+/* Timeline steps */
+.deck-steps {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.65rem;
+  font-size: 0.44em;
+}
+
+.deck-step {
+  flex: 1;
+  min-width: 8.5rem;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  padding: 0.5rem 0.55rem;
+}
+
+.deck-step .n {
+  color: var(--hot-pink);
+  font-weight: 700;
+  font-size: 0.85em;
+}
+
+/* Scenario columns */
+.deck-s3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-top: 0.65rem;
+  font-size: 0.48em;
+}
+
+.deck-s3 .s {
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 0.65rem;
+}
+
+.deck-s3 .s-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.35rem;
+}
+
+.deck-s3 .sid {
+  font-weight: 700;
+  color: var(--hot-pink);
+  font-size: 1.2em;
+}
+
+/* Rubric mini grid */
+.deck-rubric {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+  font-size: 0.42em;
+}
+
+.deck-rubric .r {
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  padding: 0.45rem 0.5rem;
+}
+
+.deck-rubric .r strong {
+  color: var(--hot-pink);
+  display: block;
+  font-size: 0.95em;
+  margin-bottom: 0.15rem;
+}
+
+/* Battery icon strip */
+.deck-batt {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  font-size: 0.46em;
+  text-align: center;
+}
+
+.deck-batt .b {
+  flex: 1;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 0.55rem 0.35rem;
+}
+
+.deck-batt .b svg {
+  width: 1.4rem;
+  height: 1.4rem;
+  color: var(--hot-pink);
+  margin: 0 auto 0.3rem;
+  display: block;
+}
+
+/* Table compact */
+.deck-table {
+  width: 100%;
+  font-size: 0.46em;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+}
+
+.deck-table th,
+.deck-table td {
+  border-bottom: 1px solid var(--hairline);
+  padding: 0.35rem 0.45rem;
+  text-align: left;
+}
+
+.deck-table th {
+  color: var(--hot-pink);
+  font-weight: 700;
+}
+
+.deck-table tr:last-child td {
+  font-weight: 700;
+  color: var(--hot-pink);
+}
+
+/* Placeholder chart area */
+.deck-ph {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px dashed var(--hairline);
+  border-radius: 12px;
+  min-height: 7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.5em;
+  margin-top: 0.5rem;
+}
+
+/* Argument chain */
+.deck-chain {
+  font-size: 0.5em;
+  margin-top: 0.5rem;
+}
+
+.deck-chain .row {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  gap: 0.65rem;
+  align-items: start;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid rgba(85, 51, 74, 0.4);
+}
+
+.deck-chain .lbl {
+  font-weight: 700;
+  color: var(--hot-pink);
+}
+
+/* Three-column implications */
+.deck-triple {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-top: 0.55rem;
+  font-size: 0.48em;
+}
+
+/* Full-bleed background slide */
+section.deck-fullbleed {
+  position: relative;
+  overflow: hidden;
+}
+
+.deck-fullbleed .deck-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  filter: brightness(0.42) saturate(1.05);
+}
+
+.deck-fullbleed .deck-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    120deg,
+    rgba(0, 0, 0, 0.88) 0%,
+    rgba(52, 1, 31, 0.72) 55%,
+    rgba(169, 8, 142, 0.25) 100%
+  );
+}
+
+.deck-fullbleed .deck-slide {
+  position: relative;
+  z-index: 1;
+  justify-content: center;
+  min-height: 100%;
+}
+
+.deck-hero-line {
+  font-size: 1.35em;
+  font-weight: 700;
+  color: var(--white);
+  max-width: 85%;
+  line-height: 1.2;
+  text-shadow: 0 4px 32px rgba(0, 0, 0, 0.8);
+}
+
+.deck-hero-line em {
+  color: var(--hot-pink);
+  font-style: normal;
+}
+
+/* Works cited */
+.deck-cite {
+  columns: 2;
+  column-gap: 2rem;
+  font-size: 0.32em;
+  line-height: 1.4;
+  color: var(--soft);
+  margin-top: 0.5rem;
+}
+
+.deck-cite p {
+  margin: 0 0 0.5rem;
+  break-inside: avoid;
+}
+
+/* Title decorative orb */
+.deck-orb {
+  position: absolute;
+  width: 42vmin;
+  height: 42vmin;
+  border-radius: 50%;
+  background: var(--magenta);
+  opacity: 0.35;
+  filter: blur(8px);
+  left: -18vmin;
+  bottom: 8vmin;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.deck-title-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.deck-kicker {
+  font-size: 0.42em;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--hot-pink);
+  margin-bottom: 0.5rem;
+}
+
+.deck-title-main {
+  font-size: 1.65em;
+  font-weight: 700;
+  color: var(--white);
+  line-height: 1.08;
+  margin-bottom: 0.45rem;
+}
+
+.deck-title-sub {
+  font-size: 0.58em;
+  color: var(--soft);
+  max-width: 38rem;
+  line-height: 1.35;
+  margin-bottom: 1.25rem;
+}
+
+.deck-title-meta {
+  font-size: 0.42em;
+  color: var(--muted);
+}
