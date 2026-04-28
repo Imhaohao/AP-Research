@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { Resend } from 'resend';
 import { NextRequest, NextResponse } from 'next/server';
 import { notifyDatabaseChange } from '@/lib/dbChangeAlerts';
 
@@ -27,6 +28,43 @@ function isMissingColumnError(error: { code?: string; message?: string }): boole
     error.code === 'PGRST204' ||
     /could not find the '.*' column of 'study_results' in the schema cache/i.test(error.message ?? '')
   );
+}
+
+async function sendThankYouEmail(input: {
+  participantEmail: string | null;
+  lotteryOptIn: boolean | null;
+  appUrl: string;
+}) {
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const resendFrom = process.env.RESEND_FROM_EMAIL || 'AP Research <onboarding@resend.dev>';
+
+  if (!resendApiKey || !input.participantEmail) {
+    return;
+  }
+
+  try {
+    const resend = new Resend(resendApiKey);
+    await resend.emails.send({
+      from: resendFrom,
+      to: [input.participantEmail],
+      subject: 'Thank you for completing the AP Research experiment',
+      html: `
+        <div style="font-family: Inter, Arial, sans-serif; line-height: 1.5; color: #1f2937;">
+          <h2 style="margin-bottom: 8px;">Thank you for participating</h2>
+          <p>Your AP Research experiment responses were saved successfully.</p>
+          ${
+            input.lotteryOptIn
+              ? '<p>You opted in to the lottery drawing. The researcher will follow up if you are selected.</p>'
+              : ''
+          }
+          <p>Study site: <a href="${input.appUrl}">${input.appUrl}</a></p>
+          <p>If you have any questions, please email <a href="mailto:zy53492@pausd.us">zy53492@pausd.us</a>. Please do NOT reply to this email.</p>
+        </div>
+      `,
+    });
+  } catch (emailError) {
+    console.error('Thank-you email failed:', emailError);
+  }
 }
 
 export async function POST(request: NextRequest) {
