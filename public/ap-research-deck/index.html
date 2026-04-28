@@ -763,6 +763,54 @@
     <script src="https://cdn.jsdelivr.net/npm/reveal.js@6.0.1/dist/reveal.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/reveal.js@6.0.1/dist/plugin/notes.js"></script>
     <script>
+      function shortChipLabel(text) {
+        const cleaned = (text || "").replace(/\s+/g, " ").trim();
+        const parts = cleaned.split(":");
+        const head = parts[0].trim();
+        if (head.length <= 26) return head;
+        return cleaned.split(" ").slice(0, 4).join(" ");
+      }
+
+      function addPreviewPolish() {
+        const slides = document.querySelectorAll(".slides section .deck-slide");
+        slides.forEach((slide, idx) => {
+          const isTitle = slide.classList.contains("deck-slide--title");
+          const hasCite = slide.querySelector(".deck-cite");
+          const hasAvatar = slide.querySelector(".deck-avatar");
+
+          // Add face badge to most content slides.
+          if (!isTitle && !hasCite && !hasAvatar) {
+            const avatar = document.createElement("div");
+            avatar.className = "deck-avatar";
+            // Minor visual variation
+            avatar.style.filter = `hue-rotate(${(idx % 4) * 12}deg)`;
+            slide.appendChild(avatar);
+          }
+
+          // Fill lower whitespace with key chips for icon-list slides.
+          const iconItems = [...slide.querySelectorAll(".icon-list li")];
+          const hasChipRow = slide.querySelector(".deck-chip-row");
+          if (!hasCite && iconItems.length >= 3 && !hasChipRow) {
+            const row = document.createElement("div");
+            row.className = "deck-chip-row";
+            iconItems.slice(0, 3).forEach((li) => {
+              const chip = document.createElement("div");
+              chip.className = "chip";
+              const k = document.createElement("span");
+              k.className = "k";
+              k.textContent = "KEY SIGNAL";
+              const v = document.createElement("span");
+              v.className = "v";
+              v.textContent = shortChipLabel(li.textContent);
+              chip.appendChild(k);
+              chip.appendChild(v);
+              row.appendChild(chip);
+            });
+            slide.appendChild(row);
+          }
+        });
+      }
+
       Reveal.initialize({
         hash: true,
         slideNumber: "c/t",
@@ -775,6 +823,8 @@
         backgroundTransition: "fade",
         plugins: [RevealNotes],
       });
+
+      addPreviewPolish();
     </script>
   </body>
 </html>

@@ -324,15 +324,15 @@ CITE = {
     "mit_sloan": "MIT Sloan Teaching & Learning Technologies. \"Effective Prompts for AI: The Essentials.\" 2025.",
     "patterns": "Chen, B., et al. \"Unleashing the Potential of Prompt Engineering for Large Language Models.\" Patterns, vol. 6, no. 6, 2025, p. 101260.",
     "chen_k12": "Chen, I-Sheng, et al. \"A Systematic Review on Prompt Engineering in Large Language Models for K-12 STEM Education.\" arXiv, 2024.",
-    "dennison": "Dennison, D. V., et al. \"From Consumers to Critical Users: Prompty, an AI Literacy Tool for High School Students.\" Proceedings of the AAAI Conference on Artificial Intelligence, vol. 37, no. 13, 2024.",
-    "park_idea": "Park, J., and S. Choo. \"Generative AI Prompt Engineering for Educators: Practical Strategies.\" Journal of Special Education Technology, 2024.",
+    "dennison": "Dennison, D. V., et al. \"From Consumers to Critical Users: Prompty, an AI Literacy Tool for High School Students.\" Proceedings of the AAAI Conference on Artificial Intelligence, vol. 38, no. 21, 2024.",
+    "park_idea": "Park, J., and S. Choo. \"Generative AI Prompt Engineering for Educators: Practical Strategies.\" Journal of Special Education Technology, vol. 40, no. 3, 2025, pp. 411-417.",
     "gogan": "Gogan, B. \"The Gen/ReGen Log: Refining the Rhetoric of Structured Prompts.\" The WAC Clearinghouse, 2024.",
     "leung": "Leung, C. H. \"Promoting Optimal Learning with ChatGPT: A Comprehensive Exploration of Prompt Engineering in Education.\" Asian Journal of Contemporary Education, vol. 8, no. 2, 2024, pp. 104-114.",
     "kabeer": "Kabeer, A., et al. \"Enhancing Creative Writing Skills in Secondary School Students through Prompt Engineering and Artificial Intelligence.\" Forum for Linguistic Studies, vol. 7, no. 3, 2025, pp. 800-815.",
     "woo": "Woo, D. J., et al. \"Cases of EFL Secondary Students' Prompt Engineering Pathways to Complete a Writing Task with ChatGPT.\" arXiv, 2023.",
-    "xie": "Xie, B., et al. \"Teachers' Considerations for AI Across Disciplines.\" Proceedings of the AAAI Conference on Artificial Intelligence, vol. 38, no. 21, 2024.",
+    "xie": "Xie, B., et al. \"Co-designing AI Education Curriculum with Cross-Disciplinary High School Teachers.\" Proceedings of the AAAI Conference on Artificial Intelligence, vol. 38, no. 21, 2024.",
     "cornell_ethics": "Cornell University Center for Teaching Innovation. \"Ethical AI for Teaching and Learning.\" 2024.",
-    "xiao": "Xiao, Z., et al. \"Rubric-Anchored LLM-as-Judge Grading of Student Prompts.\" 2025 (rubric source for the auto-grader in this study).",
+    "xiao": "Xiao, R., et al. \"Learning to Use AI for Learning: How Can We Effectively Teach and Measure Prompting Literacy for K–12 Students?\" arXiv, 2025 (rubric source for the auto-grader in this study).",
 }
 
 
