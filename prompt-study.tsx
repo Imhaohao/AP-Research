@@ -63,11 +63,6 @@ export default function PromptStudy() {
     google?: { response: string; error?: string };
   }>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [apiTokens, setApiTokens] = useState({
-    openai: "",
-    anthropic: "",
-    google: "",
-  });
 
   function renderConsent() {
     return (
@@ -333,17 +328,17 @@ export default function PromptStudy() {
         fetch("/api/llm/openai", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: userPrompt, apiKey: apiTokens.openai }),
+          body: JSON.stringify({ prompt: userPrompt }),
         }),
         fetch("/api/llm/anthropic", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: userPrompt, apiKey: apiTokens.anthropic }),
+          body: JSON.stringify({ prompt: userPrompt }),
         }),
         fetch("/api/llm/google", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: userPrompt, apiKey: apiTokens.google }),
+          body: JSON.stringify({ prompt: userPrompt }),
         }),
       ]);
 
@@ -402,45 +397,6 @@ export default function PromptStudy() {
           Try out the prompting techniques you just learned! Enter a prompt below and see how three different AI models respond.
           This will help you compare different AI responses and refine your prompting skills.
         </p>
-
-        <div style={{ marginTop: 24, padding: 16, backgroundColor: "#f5f5f5", borderRadius: 8 }}>
-          <h3>API Configuration</h3>
-          <p style={{ fontSize: 14, color: "#666" }}>
-            Enter your API keys below. These are stored locally in your browser and only used for this session.
-          </p>
-          <div style={{ marginTop: 12 }}>
-            <label style={{ display: "block", marginBottom: 8 }}>
-              <strong>OpenAI API Key:</strong>
-              <input
-                type="password"
-                value={apiTokens.openai}
-                onChange={(e) => setApiTokens({ ...apiTokens, openai: e.target.value })}
-                placeholder="sk-..."
-                style={{ width: "100%", padding: 8, marginTop: 4, borderRadius: 4, border: "1px solid #ccc" }}
-              />
-            </label>
-            <label style={{ display: "block", marginTop: 12, marginBottom: 8 }}>
-              <strong>Anthropic API Key:</strong>
-              <input
-                type="password"
-                value={apiTokens.anthropic}
-                onChange={(e) => setApiTokens({ ...apiTokens, anthropic: e.target.value })}
-                placeholder="sk-ant-..."
-                style={{ width: "100%", padding: 8, marginTop: 4, borderRadius: 4, border: "1px solid #ccc" }}
-              />
-            </label>
-            <label style={{ display: "block", marginTop: 12, marginBottom: 8 }}>
-              <strong>Google API Key:</strong>
-              <input
-                type="password"
-                value={apiTokens.google}
-                onChange={(e) => setApiTokens({ ...apiTokens, google: e.target.value })}
-                placeholder="AIza..."
-                style={{ width: "100%", padding: 8, marginTop: 4, borderRadius: 4, border: "1px solid #ccc" }}
-              />
-            </label>
-          </div>
-        </div>
 
         <div style={{ marginTop: 24 }}>
           <label>

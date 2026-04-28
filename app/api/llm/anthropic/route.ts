@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt, apiKey } = await request.json();
+    const { prompt } = await request.json();
 
     if (!prompt) {
       return NextResponse.json(
@@ -11,10 +11,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!apiKey) {
+    const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+
+    if (!anthropicApiKey) {
       return NextResponse.json(
-        { error: 'Anthropic API key is required' },
-        { status: 400 }
+        { error: 'ANTHROPIC_API_KEY is not configured on the server.' },
+        { status: 503 }
       );
     }
 
@@ -22,7 +24,7 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
+        'x-api-key': anthropicApiKey,
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({

@@ -168,9 +168,10 @@ export default function PromptStudy({
     q3: 0,
     q4: 0,
     q5: 0,
-    open1: "",
-    open2: "",
-    open3: "",
+    q6: 0,
+    q7: 0,
+    q8: 0,
+    openReflection: "",
   });
 
   /** ----- Pre/Post assessment state (Xiao Study 2-style: TF + OE + Likert + hallucination subtest) ----- */
@@ -319,10 +320,12 @@ export default function PromptStudy({
     compareAiDidBetter: '',
     partnerShareReflection: '',
     revisedNarrative: '',
-    discussStrengths: '',
-    discussLimitations: '',
-    discussOriginalVsAi: '',
-    discussBalanceCreativity: '',
+    /** Activity 4 — Likert (1–5); 0 = not answered */
+    reflectL1: 0,
+    reflectL2: 0,
+    reflectL3: 0,
+    reflectL4: 0,
+    reflectOptionalNote: '',
     exitBenefits: '',
     exitChallenges: '',
     commitmentStatement: '',
@@ -523,12 +526,13 @@ export default function PromptStudy({
   }, [stage, flushSubmission]);
 
   /**
-   * Modern (non-legacy) flow: 2-arm design routed via `twoArmCondition`.
-   *   Control  : consent -> preAssess -> module (reading) -> craft... -> postAssess
-   *   Treatment: consent -> preAssess -> modulePractice (3 scenarios) -> craft... -> postAssess
-   * The CRAFT writing task runs for BOTH arms as the shared behavioral arena.
+   * Modern RCT: 3 systematic arms for AI-coaching prompts (coachArm from Supabase sequence).
+   * The intro module splits reading (arm 0) vs interactive scenarios (arms 1 & 2) via `twoArmCondition`.
    *
-   * Legacy flow: unchanged from the original implementation.
+   * - Modern: consent → preAssess → module[/modulePractice] → CRAFT lesson → brief post‑survey (Likert attitudes)
+   *   → postAssess (same structured pre/post knowledge test as preAssess).
+   * - Legacy CRAFT: CRAFT lesson → post‑survey → thank you (skips RCT pre/post test).
+   * - Legacy default: classic module/task → post‑survey.
    */
   const flowStages: Stage[] = legacyTwoArm
     ? useCraftPath
@@ -541,6 +545,7 @@ export default function PromptStudy({
           'craftRevise',
           'craftReflect',
           'craftExit',
+          'postSurvey',
           'complete',
         ]
       : ['consent', 'module', 'task', 'postSurvey', 'complete']
@@ -555,6 +560,7 @@ export default function PromptStudy({
         'craftRevise',
         'craftReflect',
         'craftExit',
+        'postSurvey',
         'postAssess',
         'complete',
       ];
@@ -651,7 +657,7 @@ export default function PromptStudy({
                 <li>Short pre-test: True/False questions, two short written prompts, a 3-question factuality check, and 5 confidence ratings</li>
                 <li>Brief learning activities on digital literacy and prompt use</li>
                 <li>Narrative writing task with an AI assistant (your draft, an AI draft, compare, revise, reflect, exit ticket)</li>
-                <li>Short post-test matching the pre-test structure</li>
+                <li>Brief post-survey with rating scales about your experience, then the same structured post-test as the pre-test</li>
                 <li>Total time: about 55–70 minutes</li>
               </>
             )}
@@ -675,7 +681,20 @@ export default function PromptStudy({
               {assignStatus === 'ready' && treatmentArm !== null && (
                 <>
                   <p style={{ marginBottom: '0.35rem' }}>
-                    <strong>Your study materials are ready.</strong>
+                    <strong>{ARM_LABELS[treatmentArm].short}</strong>
+                  </p>
+                  <p style={{ marginBottom: '0.35rem', fontSize: '0.95rem' }}>
+                    {ARM_LABELS[treatmentArm].description}
+                  </p>
+                  {participantSequence !== null ? (
+                    <p style={{ marginBottom: 0, fontSize: '0.85rem', color: '#555' }}>
+                      Enrollment order (for assignment): {participantSequence}
+                    </p>
+                  ) : null}
+                  <p style={{ marginBottom: 0, marginTop: '0.75rem', fontSize: '0.85rem', color: '#555' }}>
+                    The research design uses <strong>three arms</strong> for how the writing assistant is instructed to
+                    behave. The first block (short reading vs. interactive scenarios) uses a <strong>two-group</strong>{' '}
+                    split: reading-only for arm&nbsp;A, and the interactive scenarios for arms&nbsp;B and C.
                   </p>
                 </>
               )}
@@ -1649,56 +1668,63 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
   }
 
   function renderCraftReflect() {
+    const reflectLikertAnswered =
+      craftData.reflectL1 > 0 &&
+      craftData.reflectL2 > 0 &&
+      craftData.reflectL3 > 0 &&
+      craftData.reflectL4 > 0;
     return craftNavCard(
       <>
         <p>
           <strong>Activity 4 · Discussion</strong> (async — respond as you would in a circle)
         </p>
+        <p style={{ fontSize: '0.9rem', color: '#555', marginBottom: '0.5rem' }}>
+          Rate your agreement with each statement (1 = Strongly disagree, 5 = Strongly agree).
+        </p>
         <div className="form-group">
           <label>
-            <strong>Strengths of using ChatGPT-style tools for narrative writing?</strong>
-            <textarea
-              value={craftData.discussStrengths}
-              onChange={(e) => setCraftData({ ...craftData, discussStrengths: e.target.value })}
-              rows={3}
-              style={{ marginTop: '0.5rem' }}
-            />
+            <strong>ChatGPT-style tools helped me brainstorm or develop ideas for this narrative activity.</strong>
+            {renderLikert(craftData.reflectL1, (v) => setCraftData({ ...craftData, reflectL1: v }), 'reflect-l1')}
           </label>
         </div>
         <div className="form-group">
           <label>
-            <strong>Limitations you noticed?</strong>
-            <textarea
-              value={craftData.discussLimitations}
-              onChange={(e) => setCraftData({ ...craftData, discussLimitations: e.target.value })}
-              rows={3}
-              style={{ marginTop: '0.5rem' }}
-            />
+            <strong>I noticed clear limits or tradeoffs when comparing my draft with the AI draft.</strong>
+            {renderLikert(craftData.reflectL2, (v) => setCraftData({ ...craftData, reflectL2: v }), 'reflect-l2')}
           </label>
         </div>
         <div className="form-group">
           <label>
-            <strong>How much of your original ideas stayed in the revised piece vs how much felt AI-driven?</strong>
-            <textarea
-              value={craftData.discussOriginalVsAi}
-              onChange={(e) => setCraftData({ ...craftData, discussOriginalVsAi: e.target.value })}
-              rows={3}
-              style={{ marginTop: '0.5rem' }}
-            />
+            <strong>My revised narrative still reflected my main ideas—not only the AI’s suggestions.</strong>
+            {renderLikert(craftData.reflectL3, (v) => setCraftData({ ...craftData, reflectL3: v }), 'reflect-l3')}
           </label>
         </div>
         <div className="form-group">
           <label>
-            <strong>How can AI support your writing without replacing your creativity?</strong>
+            <strong>Using AI felt like support for my creativity rather than replacing my voice.</strong>
+            {renderLikert(craftData.reflectL4, (v) => setCraftData({ ...craftData, reflectL4: v }), 'reflect-l4')}
+          </label>
+        </div>
+        <div className="form-group" style={{ background: '#f9f9f9' }}>
+          <label>
+            <strong>Optional:</strong> one sentence you might have said aloud in discussion
             <textarea
-              value={craftData.discussBalanceCreativity}
-              onChange={(e) => setCraftData({ ...craftData, discussBalanceCreativity: e.target.value })}
-              rows={3}
+              value={craftData.reflectOptionalNote}
+              onChange={(e) => setCraftData({ ...craftData, reflectOptionalNote: e.target.value })}
+              rows={2}
+              placeholder="Optional"
               style={{ marginTop: '0.5rem' }}
             />
           </label>
         </div>
-        <button type="button" onClick={() => setStage('craftExit')}>
+        {!reflectLikertAnswered ? (
+          <p style={{ fontSize: '0.85rem', color: '#8B7230' }}>Please select a rating for each statement above.</p>
+        ) : null}
+        <button
+          type="button"
+          disabled={!reflectLikertAnswered}
+          onClick={() => setStage('craftExit')}
+        >
           Continue to exit ticket →
         </button>
       </>,
@@ -1805,11 +1831,11 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
 
         <button
           type="button"
-          onClick={() => setStage(legacyTwoArm ? 'complete' : 'postAssess')}
+          onClick={() => setStage('postSurvey')}
           disabled={lotteryOptIn && !participantNumber.trim()}
           style={{ marginTop: '1rem' }}
         >
-          {legacyTwoArm ? 'Submit study →' : 'Continue to post-test →'}
+          Continue to post-survey →
         </button>
       </>,
       'Exit ticket & commitment',
@@ -2621,12 +2647,30 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
   }
 
   function renderPostSurvey() {
+    const postLikertComplete =
+      postResponses.q1 > 0 &&
+      postResponses.q2 > 0 &&
+      postResponses.q3 > 0 &&
+      postResponses.q4 > 0 &&
+      postResponses.q5 > 0 &&
+      postResponses.q6 > 0 &&
+      postResponses.q7 > 0 &&
+      postResponses.q8 > 0;
     return (
       <div className="lms-container">
         {renderProgressBar()}
         <div className="lms-card">
           <h2>Post‑Survey</h2>
-          <p>Please rate your agreement with each statement about your AI use in this activity (1=Strongly Disagree, 5=Strongly Agree).</p>
+          <p>
+            Please rate your agreement with each statement about your experience in this activity (1 = Strongly disagree,
+            5 = Strongly agree).
+          </p>
+          {!legacyTwoArm ? (
+            <p style={{ fontSize: '0.9rem', color: '#555' }}>
+              After this short survey, you will complete the same structured post-test as the pre-test (True/False, short
+              written items, factuality check, and confidence items).
+            </p>
+          ) : null}
 
           <div className="form-group">
             <label>
@@ -2665,39 +2709,46 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
 
           <div className="form-group">
             <label>
-              <strong>Describe one example of how you changed your prompting after this activity.</strong>
-              <textarea
-                value={postResponses.open1}
-                onChange={(e) => setPostResponses({ ...postResponses, open1: e.target.value })}
-                rows={3}
-              />
+              <strong>This lesson changed how I think about using AI for writing or schoolwork.</strong>
+              {renderLikert(postResponses.q6, (v) => setPostResponses({ ...postResponses, q6: v }), "post-q6")}
             </label>
           </div>
 
           <div className="form-group">
             <label>
-              <strong>How did this lesson change the way you approach learning or writing?</strong>
-              <textarea
-                value={postResponses.open2}
-                onChange={(e) => setPostResponses({ ...postResponses, open2: e.target.value })}
-                rows={3}
-              />
+              <strong>Clear prompting (specific instructions to the AI) improves the help I get.</strong>
+              {renderLikert(postResponses.q7, (v) => setPostResponses({ ...postResponses, q7: v }), "post-q7")}
             </label>
           </div>
 
           <div className="form-group">
             <label>
-              <strong>Do you think all students should learn prompt engineering? Why or why not?</strong>
+              <strong>I would recommend a lesson like this to a classmate.</strong>
+              {renderLikert(postResponses.q8, (v) => setPostResponses({ ...postResponses, q8: v }), "post-q8")}
+            </label>
+          </div>
+
+          <div className="form-group" style={{ background: '#f9f9f9' }}>
+            <label>
+              <strong>Optional:</strong> anything else you want the research team to know
               <textarea
-                value={postResponses.open3}
-                onChange={(e) => setPostResponses({ ...postResponses, open3: e.target.value })}
-                rows={3}
+                value={postResponses.openReflection}
+                onChange={(e) => setPostResponses({ ...postResponses, openReflection: e.target.value })}
+                rows={2}
+                style={{ marginTop: '0.5rem' }}
               />
             </label>
           </div>
 
-          <button onClick={() => setStage("complete")}>
-            Complete Study →
+          {!postLikertComplete ? (
+            <p style={{ fontSize: '0.85rem', color: '#8B7230' }}>Please answer every rating question before continuing.</p>
+          ) : null}
+
+          <button
+            disabled={!postLikertComplete}
+            onClick={() => setStage(legacyTwoArm ? 'complete' : 'postAssess')}
+          >
+            {legacyTwoArm ? 'Complete Study →' : 'Continue to post-test →'}
           </button>
         </div>
       </div>
