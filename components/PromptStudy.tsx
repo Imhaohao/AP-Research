@@ -526,14 +526,32 @@ export default function PromptStudy({
   }, [stage, flushSubmission]);
 
   /**
-   * Modern RCT: 3 systematic arms for AI-coaching prompts (coachArm from Supabase sequence).
-   * The intro module splits reading (arm 0) vs interactive scenarios (arms 1 & 2) via `twoArmCondition`.
+   * Arm C (treatment_arm === 2, guided + prompt bank): exit ticket & lottery come **after** the structured post-test so
+   * they are the last interactive step before the thank-you screen. Arms A/B keep exit ticket before Likert post-survey +
+   * post-test (original order).
    *
-   * - Modern: consent → preAssess → module[/modulePractice] → CRAFT lesson → brief post‑survey (Likert attitudes)
-   *   → postAssess (same structured pre/post knowledge test as preAssess).
+   * - Modern: consent → preAssess → module[/modulePractice] → CRAFT lesson → [Arm A/B: exit → postLikert → post-test |
+   *   Arm C: postLikert → post-test → exit] → thank you.
    * - Legacy CRAFT: CRAFT lesson → post‑survey → thank you (skips RCT pre/post test).
    * - Legacy default: classic module/task → post‑survey.
    */
+  /** RCT arm 2 = prompt_bank_ai — exit ticket last after post-test */
+  const armCExitLast = !legacyTwoArm && treatmentArm === 2;
+
+  const modernBaseStagesBeforeCraft: Stage[] = [
+    'consent',
+    'preAssess',
+    twoArmCondition === 'treatment' ? 'modulePractice' : 'module',
+  ];
+  const craftStages: Stage[] = [
+    'craftIntro',
+    'craftHuman',
+    'craftAI',
+    'craftCompare',
+    'craftRevise',
+    'craftReflect',
+  ];
+
   const flowStages: Stage[] = legacyTwoArm
     ? useCraftPath
       ? [
@@ -549,21 +567,9 @@ export default function PromptStudy({
           'complete',
         ]
       : ['consent', 'module', 'task', 'postSurvey', 'complete']
-    : [
-        'consent',
-        'preAssess',
-        twoArmCondition === 'treatment' ? 'modulePractice' : 'module',
-        'craftIntro',
-        'craftHuman',
-        'craftAI',
-        'craftCompare',
-        'craftRevise',
-        'craftReflect',
-        'craftExit',
-        'postSurvey',
-        'postAssess',
-        'complete',
-      ];
+    : armCExitLast
+      ? [...modernBaseStagesBeforeCraft, ...craftStages, 'postSurvey', 'postAssess', 'craftExit', 'complete']
+      : [...modernBaseStagesBeforeCraft, ...craftStages, 'craftExit', 'postSurvey', 'postAssess', 'complete'];
 
   const stageShortLabel: Record<Stage, string> = {
     consent: 'Consent',
@@ -1723,9 +1729,9 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
         <button
           type="button"
           disabled={!reflectLikertAnswered}
-          onClick={() => setStage('craftExit')}
+          onClick={() => setStage(armCExitLast ? 'postSurvey' : 'craftExit')}
         >
-          Continue to exit ticket →
+          {armCExitLast ? 'Continue to post-survey →' : 'Continue to exit ticket →'}
         </button>
       </>,
       'Activity 4 · Reflect (~10 min)',
@@ -1831,15 +1837,17 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
 
         <button
           type="button"
-          onClick={() => setStage('postSurvey')}
+          onClick={() =>
+            setStage(legacyTwoArm || !armCExitLast ? 'postSurvey' : 'complete')
+          }
           disabled={lotteryOptIn && !participantNumber.trim()}
           style={{ marginTop: '1rem' }}
         >
-          Continue to post-survey →
+          {legacyTwoArm || !armCExitLast ? 'Continue to post-survey →' : 'Finish & thank you →'}
         </button>
       </>,
       'Exit ticket & commitment',
-      'Final step — submit your responses'
+      armCExitLast ? 'Last step before thank you — submit & optional lottery' : 'Final CRAFT step — then attitude & knowledge surveys'
     );
   }
 
@@ -2305,7 +2313,7 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
               if (isPre) {
                 setStage(twoArmCondition === 'treatment' ? 'modulePractice' : 'module');
               } else {
-                setStage('complete');
+                setStage(armCExitLast ? 'craftExit' : 'complete');
               }
             }}
           >
@@ -2313,7 +2321,9 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
               ? twoArmCondition === 'treatment'
                 ? 'Continue to interactive module →'
                 : 'Continue to reading →'
-              : 'Submit study →'}
+              : armCExitLast
+                ? 'Continue to exit ticket →'
+                : 'Submit study →'}
           </button>
         </div>
       </div>
@@ -2667,8 +2677,9 @@ Do NOT write the explanation for them. Instead, guide them with questions, sugge
           </p>
           {!legacyTwoArm ? (
             <p style={{ fontSize: '0.9rem', color: '#555' }}>
-              After this short survey, you will complete the same structured post-test as the pre-test (True/False, short
-              written items, factuality check, and confidence items).
+              {armCExitLast
+                ? 'After this short survey, you will complete the structured post-test (same kinds of questions as the pre-test). Your last steps before thank you will be a brief exit ticket and optional lottery.'
+                : 'After this short survey, you will complete the same structured post-test as the pre-test (True/False, short written items, factuality check, and confidence items).'}
             </p>
           ) : null}
 
